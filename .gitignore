@@ -1,0 +1,41 @@
+# Binary / build output
+bin/
+server
+
+# Go toolchain
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Editor & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Test artifacts
+coverage.out
+coverage.html
+
+# Docker volumes (if mounted locally)
+.docker-data/
+
+# Logs
+*.log
