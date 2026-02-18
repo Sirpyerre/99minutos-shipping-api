@@ -2,7 +2,7 @@ package config
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 
 	"github.com/sethvargo/go-envconfig"
 )
@@ -27,14 +27,11 @@ type RedisConfig struct {
 	DB   int    `env:"REDIS_DB,   default=0"`
 }
 
-
-
 // Load reads configuration from environment variables using go-envconfig.
-func Load(logger *slog.Logger) *Config {
+func Load() *Config {
 	var cfg Config
 	if err := envconfig.Process(context.Background(), &cfg); err != nil {
-		logger.Error("Failed to load configuration", "error", err)
-		panic(err)
+		panic(fmt.Sprintf("config: failed to load configuration: %v", err))
 	}
 	return &cfg
 }

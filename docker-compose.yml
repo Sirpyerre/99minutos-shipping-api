@@ -25,7 +25,7 @@ services:
     container_name: shipping_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6378:6378"
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -44,21 +44,25 @@ services:
     container_name: shipping_api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     env_file:
       - .env
     environment:
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB: shipping_system
-      REDIS_ADDR: redis:6379
-      REDIS_DB: "0"
+      PORT: ${PORT:-8080}
+      ENV: ${ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB: ${MONGO_DB:-shipping_system}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6378}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-8080}/health"]
       interval: 15s
       timeout: 5s
       retries: 3
