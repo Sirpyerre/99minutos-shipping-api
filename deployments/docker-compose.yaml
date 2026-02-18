@@ -11,7 +11,7 @@ services:
       MONGO_INITDB_DATABASE: shipping_system
     volumes:
       - mongo_data:/data/db
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
@@ -39,14 +39,14 @@ services:
   # ─── API ──────────────────────────────────────────────────────────────────
   api:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: shipping_api
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
     env_file:
-      - .env
+      - ../configs/.env
     environment:
       PORT: ${PORT:-8080}
       ENV: ${ENV:-development}

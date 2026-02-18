@@ -232,7 +232,7 @@ Client sends: POST /events or POST /events/batch
 | **Testing** | testify, testcontainers | Standard Go testing practices; assertion library; integration tests with real containers |
 | **Logging** | Slog (Go 1.25) | Structured logging; zero dependencies; fast; integrated in stdlib |
 | **Validation** | Echo Binder + Custom Validators | Type-safe validation; error handling integrated with HTTP responses |
-| **Container** | Docker + docker-compose | Reproducible environment; easy local development |
+| **Container** | Docker + docker compose | Reproducible environment; easy local development |
 
 ### Why Echo Framework (Over Chi)
 
@@ -520,16 +520,16 @@ GET /shipments?client_id=X
 ```bash
 # 1. Clone repository
 git clone <repo-url>
-cd shipping-system
+cd 99minutos-shipment-api
 
 # 2. Create environment file
-cp .env.example .env
+cp configs/.env.example configs/.env
 
 # 3. Start all services
-docker-compose up -d
+docker compose -f deployments/docker-compose.yaml up -d
 
 # 4. Verify services are running
-docker-compose ps
+docker compose -f deployments/docker-compose.yaml ps
 
 # 5. Test API
 curl -X POST http://localhost:8080/health
@@ -541,23 +541,23 @@ curl -X POST http://localhost:8080/health
 
 ```bash
 # Start services (MongoDB, Redis, API)
-docker-compose up -d
+docker compose -f deployments/docker-compose.yaml up -d
 
 # View logs
-docker-compose logs -f api
+docker compose -f deployments/docker-compose.yaml logs -f api
 
 # Stop services
-docker-compose down
+docker compose -f deployments/docker-compose.yaml down
 
 # Clean up (including volumes)
-docker-compose down -v
+docker compose -f deployments/docker-compose.yaml down -v
 ```
 
 #### Option B: Local Development (with Docker services only)
 
 ```bash
 # Start MongoDB and Redis
-docker-compose up -d mongo redis
+docker compose -f deployments/docker-compose.yaml up -d mongo redis
 
 # Install dependencies
 go mod download
@@ -571,7 +571,7 @@ go test ./... -v
 
 ### Environment Configuration
 
-Create `.env` file:
+Create `configs/.env` file:
 
 ```env
 # Server
@@ -583,7 +583,7 @@ MONGO_URI=mongodb://mongo:27017
 MONGO_DB=shipping_system
 
 # Redis
-REDIS_ADDR=redis:6379
+REDIS_ADDR=redis:6378
 REDIS_DB=0
 
 # JWT
@@ -597,10 +597,10 @@ LOG_LEVEL=info
 
 ```bash
 # Check MongoDB
-docker-compose exec mongo mongosh --eval "db.version()"
+docker compose -f deployments/docker-compose.yaml exec mongo mongosh --eval "db.version()"
 
 # Check Redis
-docker-compose exec redis redis-cli ping
+docker compose -f deployments/docker-compose.yaml exec redis redis-cli ping
 # Expected: PONG
 
 # Check API
@@ -1387,73 +1387,43 @@ MAINTENANCE
 ## Project Structure
 
 ```
-shipping-system/
+99minutos-shipment-api/
+├── api/
+│   └── postman/                    # Postman collection or .http files
 ├── cmd/
 │   └── server/
-│       └── main.go                 # Entry point
-│
+│       └── main.go                 # Entry point: wire config, router, deps
+├── configs/
+│   ├── .env                        # Local environment (not committed)
+│   └── .env.example                # Template
+├── deployments/
+│   └── docker-compose.yaml         # Local dev: MongoDB, Redis, API
 ├── internal/
-│   ├── domain/                     # Business logic (no external deps)
-│   │   ├── shipment.go             # Shipment entity
-│   │   ├── event.go                # Event value object
-│   │   ├── status.go               # Status enum + state machine
-│   │   └── errors.go               # Domain-specific errors
-│   │
-│   ├── application/                # Use cases
-│   │   ├── create_shipment.go
-│   │   ├── get_shipment.go
-│   │   ├── list_shipments.go
-│   │   ├── process_event.go        # Core event processing logic
-│   │   └── dto.go                  # Input/output DTOs
-│   │
-│   ├── infrastructure/             # External systems
-│   │   ├── mongo/
-│   │   │   ├── client.go           # Connection management
-│   │   │   ├── repository.go       # Shipment persistence
-│   │   │   └── migrations.go       # Schema setup
-│   │   │
-│   │   ├── redis/
-│   │   │   └── dedup_checker.go    # Idempotency checks
-│   │   │
-│   │   ├── queue/
-│   │   │   ├── event_queue.go      # Channel-based queue
-│   │   │   └── worker.go           # Event processor goroutines
-│   │   │
-│   │   └── http/
-│   │       ├── router.go           # Route setup
-│   │       ├── handlers.go         # HTTP handlers
-│   │       ├── middleware.go       # Auth, logging, etc
-│   │       └── responses.go        # Response formatters
-│   │
-│   └── shared/                     # Cross-cutting
-│       ├── config.go               # Configuration from env
-│       ├── logger.go               # Structured logging
-│       ├── auth.go                 # JWT helpers
-│       └── errors.go               # Common errors
-│
-├── tests/
-│   ├── unit/
-│   │   ├── domain_test.go
-│   │   ├── application_test.go
-│   │   └── queue_test.go
-│   │
+│   ├── api/
+│   │   ├── handler/                # HTTP handlers (shipments, events, health)
+│   │   └── middleware/             # Auth/RBAC, logging
+│   ├── core/
+│   │   ├── domain/                 # Entities + status transitions
+│   │   ├── ports/                  # Interfaces for repos/use cases
+│   │   └── service/                # Use cases / business services
+│   ├── infrastructure/
+│   │   ├── db/
+│   │   │   ├── mongo/              # MongoDB client
+│   │   │   └── redis/              # Redis client
+│   │   └── queue/                  # Async processing and concurrency
+│   └── pkg/
+│       ├── config/                 # Env loader (go-envconfig)
+│       └── logger/                 # Zerolog-based logger
+├── scripts/
+│   └── mongo-init.js               # Mongo seed script
+├── test/
+│   ├── fixtures/
 │   ├── integration/
-│   │   ├── api_test.go
-│   │   ├── mongodb_test.go
-│   │   └── concurrency_test.go
-│   │
-│   └── fixtures/
-│       └── test_data.go
-│
-├── docker-compose.yml              # Local dev environment
-├── Dockerfile                       # Container image
-├── Makefile                         # Common tasks
+│   └── unit/
+├── Dockerfile                      # Container image
+├── Makefile                        # Common tasks
 ├── go.mod / go.sum                 # Dependencies
-├── .env.example                    # Environment template
-├── .gitignore
-├── postman_collection.json         # API examples
-├── README.md                       # This file
-└── ARCHITECTURE.md                 # Detailed architecture notes
+└── README.md                       # This file
 ```
 
 ---
@@ -1469,7 +1439,7 @@ make run           # Run locally (requires services)
 make test          # Run all tests
 make test-race     # Run tests with race detector
 make test-coverage # Generate coverage report
-make docker-up     # Start services (docker-compose)
+make docker-up     # Start services (deployments/docker-compose.yaml)
 make docker-down   # Stop services
 make docker-logs   # View logs
 make lint          # Run linter (golangci-lint)

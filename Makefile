@@ -1,6 +1,7 @@
 BINARY     = bin/server
 MODULE     = github.com/99minutos/shipping-system
 BUILD_FLAGS = -ldflags="-s -w"
+DOCKER_COMPOSE = docker compose -f deployments/docker-compose.yaml
 
 .PHONY: help build run test test-race test-coverage lint fmt deps clean \
         docker-up docker-down docker-logs docker-build
@@ -41,20 +42,20 @@ clean: ## Remove build artifacts
 # ── Docker ───────────────────────────────────────────────────────────────────
 
 docker-build: ## Build the API Docker image
-	docker compose build api
+	$(DOCKER_COMPOSE) build api
 
 docker-up: ## Start MongoDB + Redis + API
-	@cp -n .env.example .env 2>/dev/null || true
-	docker compose up -d
+	@cp -n configs/.env.example configs/.env 2>/dev/null || true
+	$(DOCKER_COMPOSE) up -d
 	@echo "→ API:   http://localhost:8080/health"
 	@echo "→ Mongo: localhost:27017"
-	@echo "→ Redis: localhost:6379"
+	@echo "→ Redis: localhost:6378"
 
 docker-down: ## Stop all services
-	docker compose down
+	$(DOCKER_COMPOSE) down
 
 docker-logs: ## Follow API logs
-	docker compose logs -f api
+	$(DOCKER_COMPOSE) logs -f api
 
 docker-clean: ## Stop services and remove volumes
-	docker compose down -v
+	$(DOCKER_COMPOSE) down -v
