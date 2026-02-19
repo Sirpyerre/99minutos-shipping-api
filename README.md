@@ -1,157 +1,65 @@
-# Shipping Tracking System - 99minutos
+# Sistema de Seguimiento de Envíos — 99minutos
 
-**Senior Backend Developer Technical Challenge**
-
-A high-performance, event-driven logistics tracking system built in Go with asynchronous event processing, comprehensive status history tracking, and role-based access control. Designed to handle 10,000+ events per second with guaranteed order processing per shipment and built-in idempotency for production reliability.
+API REST orientada a eventos para el seguimiento en tiempo real de envíos logísticos. Construida con Go 1.25 y Echo v4, diseñada para procesar más de 10,000 eventos por segundo con ordenamiento garantizado por envío e idempotencia nativa.
 
 ---
 
-## Table of Contents
+## Tabla de contenidos
 
-1. [Project Overview](#project-overview)
-2. [Architecture](#architecture)
-3. [Technology Stack](#technology-stack)
-4. [Design Decisions](#design-decisions)
-5. [Getting Started](#getting-started)
-6. [API Documentation](#api-documentation)
-7. [Testing](#testing)
-8. [Scalability](#scalability)
-9. [Trade-offs & Production Considerations](#trade-offs--production-considerations)
-
----
-
-## Project Overview
-
-### Context
-A Latin American logistics company needs a real-time shipment tracking system that:
-- Registers shipments with unique tracking numbers
-- Receives real-time status updates from multiple sources (drivers, warehouses, scanners)
-- Maintains a complete audit trail of status changes
-- Exposes a secure REST API for enterprise clients to query shipment status
-- Processes high concurrency (target: 10,000+ events/second)
-
-### Requirements
-- ✅ REST API for shipment CRUD operations
-- ✅ Asynchronous event processing with immediate response
-- ✅ Duplicate event handling (idempotency)
-- ✅ Guaranteed order processing per shipment (concurrent across shipments)
-- ✅ Role-based access control (client vs admin)
-- ✅ Complete status history per shipment
-- ✅ Valid state transition enforcement
-- ✅ Docker containerization
-- ✅ Comprehensive testing
+1. [Descripción general](#descripción-general)
+2. [Arquitectura](#arquitectura)
+3. [Stack tecnológico](#stack-tecnológico)
+4. [Decisiones de diseño](#decisiones-de-diseño)
+5. [Inicio rápido](#-inicio-rápido)
+6. [Documentación de la API](#-documentación-de-la-api)
+7. [Pruebas](#pruebas)
+8. [Observabilidad](#-observabilidad)
+9. [Escalabilidad](#escalabilidad)
+10. [Trade-offs y consideraciones de producción](#trade-offs-y-consideraciones-de-producción)
+11. [Estructura del proyecto](#estructura-del-proyecto)
+12. [Comandos de desarrollo](#comandos-de-desarrollo)
+13. [Licencia](#licencia)
 
 ---
 
-## Architecture
+## Descripción general
 
-### High-Level System Diagram
+Sistema de seguimiento de envíos para una empresa de logística latinoamericana. Permite:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         CLIENT SOURCES                               │
-│    (Drivers, Warehouses, Scanners, Enterprise Clients)              │
-└──────┬──────────────────┬──────────────────────┬─────────────────────┘
-       │                  │                      │
-       ▼                  ▼                      ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        REST API GATEWAY                              │
-│  ┌──────────────────┬──────────────────┬──────────────────────────┐ │
-│  │ POST /shipments  │ GET /shipments   │ POST /events           │ │
-│  │ GET /shipments   │ GET /shipments/:id │ POST /events/batch  │ │
-│  └──────────────────┴──────────────────┴──────────────────────────┘ │
-│                                                                      │
-│               [JWT AUTH MIDDLEWARE]                                 │
-│               Roles: client, admin                                  │
-└──────┬──────────────────────────────────────────────┬────────────────┘
-       │                                              │
-       │ Shipment Operations                          │ Events
-       │ (Immediate)                                  │ (Queued - 202 Accepted)
-       │                                              │
-       ▼                                              ▼
-┌──────────────────────┐                  ┌──────────────────────────┐
-│     MONGODB          │                  │  EVENT PROCESSING LAYER  │
-│                      │                  │                          │
-│ Collections:         │                  │ ┌────────────────────┐   │
-│ • shipments          │                  │ │ Event Queue        │   │
-│ • status_events      │                  │ │ (Go Channels)      │   │
-│ • auth_users         │                  │ │                    │   │
-│                      │                  │ │ Per-shipment:      │   │
-│ Indexes:             │                  │ │ Guaranteed order   │   │
-│ • tracking_number    │                  │ │ Cross-shipment:    │   │
-│ • created_at         │                  │ │ Parallel           │   │
-│ • client_id          │                  │ └────────────────────┘   │
-│                      │                  │                          │
-│                      │                  │ ┌────────────────────┐   │
-│                      │                  │ │ Worker Pool        │   │
-│                      │                  │ │ (10 goroutines)    │   │
-│                      │                  │ │ • Validate event   │   │
-│                      │◄─────────────────┤ │ • Check dedup      │   │
-│                      │ Read/Write       │ │ • Validate state   │   │
-│                      │                  │ │ • Persist          │   │
-│                      │                  │ │ • Handle errors    │   │
-│                      │                  │ └────────────────────┘   │
-└──────────────────────┘                  │                          │
-       ▲                                  │ ┌────────────────────┐   │
-       │                                  │ │ Redis Dedup Cache  │   │
-       └──────────────────────────────────┤ │ TTL: 1 hour        │   │
-            Persist + Query                │ └────────────────────┘   │
-                                          └──────────────────────────┘
-```
+- Registrar envíos con números de rastreo únicos en formato `99M-<8-char>`
+- Recibir actualizaciones de estado en tiempo real desde múltiples fuentes (choferes, bodegas, escáneres)
+- Mantener un historial de auditoría completo por envío
+- Exponer una REST API segura con control de acceso basado en roles (RBAC)
+- Procesar alta concurrencia con target de 10,000+ eventos por segundo
 
-### Data Flow Diagram
+---
+
+## Arquitectura
+
+### Diagrama de alto nivel
+
+<img src="./docs/higth-level-architecture-shipments.svg" alt="Diagrama de arquitectura" width="800"/>
+
+### Clean Architecture — tres capas
 
 ```
-EVENT SUBMISSION
-════════════════
-
-Client sends: POST /events or POST /events/batch
-       │
-       ▼
-[API Handler]
-  ├─ Parse JSON
-  ├─ Basic validation
-  └─ Return 202 Accepted
-       │
-       ▼
-[Event Queue]
-  ├─ Add to per-shipment channel
-  └─ Trigger worker if needed
-       │
-       ▼
-[Worker Goroutine - Per Shipment] (SERIALIZED)
-  ├─ Dedup Check (Redis)
-  │   ├─ Found duplicate? → Skip + log
-  │   └─ New event? → Continue
-  │
-  ├─ Validation
-  │   ├─ Shipment exists?
-  │   ├─ Status transition allowed?
-  │   └─ Location data valid?
-  │
-  ├─ Persistence (MongoDB)
-  │   ├─ Create StatusEvent document
-  │   ├─ Update Shipment.current_status
-  │   ├─ Append to Shipment.status_history
-  │   └─ Atomic operation (transaction)
-  │
-  ├─ Cache (Redis)
-  │   └─ Mark as processed (dedup key)
-  │
-  └─ Success
-      └─ Log event processed
+internal/domain/          ← Entidades de negocio y máquina de estados (sin dependencias externas)
+internal/application/     ← Casos de uso y DTOs (depende solo del dominio)
+internal/infrastructure/  ← Handlers HTTP, MongoDB, Redis, cola de eventos
 ```
 
-### Collection Schema
+Las capas externas nunca se filtran hacia las internas. Cada capa conoce únicamente a la que está directamente por debajo.
+
+### Esquema de colecciones MongoDB
 
 ```javascript
-// shipments collection
+// Colección: shipments
 {
   _id: ObjectId,
-  tracking_number: "99M-ABC123",      // Unique, indexed
-  client_id: "client_001",             // For RBAC
+  tracking_number: "99M-ABC12345",      // Único, indexado
+  client_id: "client_001",
   origin: {
-    address: "Calle 5 #123, Mexico City",
+    address: "Calle 5 #123, Ciudad de México",
     coordinates: { lat: 19.4326, lng: -99.1332 }
   },
   destination: {
@@ -166,50 +74,34 @@ Client sends: POST /events or POST /events/batch
   current_status: "in_transit",
   created_at: ISODate("2025-02-12T10:00:00Z"),
   updated_at: ISODate("2025-02-12T15:04:05Z"),
-  
-  // Denormalized for performance
+  // Desnormalizado para lecturas en una sola consulta
   status_history: [
-    {
-      _id: ObjectId,
-      status: "created",
-      timestamp: ISODate("2025-02-12T10:00:00Z"),
-      source: "api",
-      location: null,
-      notes: "Shipment created"
-    },
-    {
-      _id: ObjectId,
-      status: "picked_up",
-      timestamp: ISODate("2025-02-12T10:15:00Z"),
-      source: "driver_app",
-      location: { lat: 19.4327, lng: -99.1331 },
-      notes: "Package picked up by driver"
-    },
-    // ... more events
+    { status: "created",    timestamp: ISODate(...), source: "api",              location: null },
+    { status: "picked_up",  timestamp: ISODate(...), source: "driver_app",       location: { lat: 19.4327, lng: -99.1331 } },
+    { status: "in_transit", timestamp: ISODate(...), source: "driver_app",       location: { lat: 19.4326, lng: -99.1332 } }
   ]
 }
 
-// status_events collection (for analytics/audit)
+// Colección: status_events (pista de auditoría)
 {
   _id: ObjectId,
-  tracking_number: "99M-ABC123",
+  tracking_number: "99M-ABC12345",
   shipment_id: ObjectId,
   status: "in_transit",
-  timestamp: ISODate("2025-02-12T15:04:05Z"),
+  timestamp: ISODate(...),
   source: "driver_app",
   location: { lat: 19.4326, lng: -99.1332 },
-  idempotency_key: "hash(tracking_number:source:timestamp)",
-  created_at: ISODate("2025-02-12T15:04:05Z")
+  idempotency_key: "dedup:<tracking>:<source>:<unix_ts>",
+  created_at: ISODate(...)
 }
 
-// auth_users collection
+// Colección: auth_users
 {
   _id: ObjectId,
   username: "client_user_001",
-  password_hash: "bcrypt_hash",
+  password_hash: "<bcrypt>",
   role: "client",
-  client_id: "client_001",  // For role: client
-  api_key: "sk_live_xyz123",
+  client_id: "client_001",
   created_at: ISODate(),
   updated_at: ISODate()
 }
@@ -217,171 +109,96 @@ Client sends: POST /events or POST /events/batch
 
 ---
 
-## Technology Stack
+## Stack tecnológico
 
-### Core Technologies
-
-| Component | Technology | Justification |
+| Componente | Tecnología | Justificación |
 |-----------|-----------|---------------|
-| **Language** | Go 1.25 | Latest stability, improved performance, type parameters fully mature, enhanced concurrency primitives |
-| **Web Framework** | Echo v4.12+ | Most idiomatic Go web framework, excellent middleware system, built-in validation, zero-copy request handling, perfect for microservices |
-| **Database** | MongoDB 4.0+ | Document model fits shipment + embedded events perfectly; TTL indexes for cleanup; ACID transactions |
-| **Cache** | Redis 7+ | Fast deduplication checks; distributed lock management; session storage |
-| **Message Queue** | Go Channels + Worker Pool | Native Go concurrency; demonstrates goroutine mastery; perfect for 10K/s (scales to 1M/s with Kafka) |
-| **Auth** | JWT (golang-jwt) | Stateless, scalable, standard; seeded credentials in DB |
-| **Testing** | testify, testcontainers | Standard Go testing practices; assertion library; integration tests with real containers |
-| **Logging** | Slog (Go 1.25) | Structured logging; zero dependencies; fast; integrated in stdlib |
-| **Validation** | Echo Binder + Custom Validators | Type-safe validation; error handling integrated with HTTP responses |
-| **Container** | Docker + docker compose | Reproducible environment; easy local development |
-
-### Why Echo Framework (Over Chi)
-
-```
-✅ Echo is Superior for This Challenge:
-
-MIDDLEWARE ECOSYSTEM
-  ├─ Built-in JWT middleware (no external lib needed)
-  ├─ CORS, GZIP, Recovery out of the box
-  ├─ Custom middleware stack pattern
-  └─ Cleaner error handling across middleware
-
-REQUEST BINDING & VALIDATION
-  ├─ Automatic JSON/XML/Form binding
-  ├─ Built-in validator support
-  ├─ Type-safe context.Bind()
-  └─ Better error messages
-
-PERFORMANCE
-  ├─ Zero-copy request handling
-  ├─ Lower memory allocation
-  ├─ Better for high concurrency (10K/s)
-  └─ Benchmarks: 2-3x faster than Chi on this workload
-
-HTTP/2 & GRACEFUL SHUTDOWN
-  ├─ HTTP/2 support built-in
-  ├─ Graceful shutdown helpers
-  ├─ Context propagation excellent
-  └─ Production-ready error handling
-
-EVALUATION CRITERIA ALIGNMENT (Por qué ganas 25% aquí)
-  ├─ 25% Código Go Idiomático → Echo patterns = Go best practices
-  ├─ 20% Arquitectura → Echo layers = clean architecture naturally
-  ├─ 20% Concurrencia → Echo + channels = perfect combination
-  └─ 15% Tests → Echo testing utilities = simple to test
-```
-
-### Why NOT Other Options
-
-```
-❌ Kafka instead of Go Channels
-   → Overkill para este volumen; adds operational complexity
-   → Go channels pueden manejar 10K/s fácilmente (benchmarks: 1M/s)
-   → Se puede cambiar a Kafka después sin alterar domain logic
-
-❌ PostgreSQL instead of MongoDB
-   → Necesitarías JSONB para status_history arrays
-   → Más joins requeridos; embedded arrays de MongoDB son más naturales
-   → TTL indexes de MongoDB son perfectos para idempotency key cleanup
-
-❌ Spring Boot / Node.js instead of Go
-   → Go excels en I/O concurrente (goroutines vs threads)
-   → Mejor utilización de recursos (1000s goroutines vs 100s threads)
-   → Challenge explícitamente requiere Golang
-
-❌ Gin instead of Echo
-   ├─ Gin: Más ligero, más simple
-   ├─ Echo: Mejor para producción, más features
-   └─ Para ESTE challenge: Echo's middleware + validation = mejor showcase de arquitectura
-```
+| Lenguaje | Go 1.25 | Concurrencia nativa, bajo uso de recursos, tipado estático |
+| Framework web | Echo v4.12+ | Middleware ecosystem maduro, binding + validación integrados |
+| Base de datos | MongoDB 7 | Modelo de documento natural para envíos con historial embebido; TTL indexes para limpieza automática |
+| Cache / Dedup | Redis 7 | Verificación de duplicados O(1); TTL configurable por clave |
+| Cola de eventos | Go Channels + Worker Pool | Concurrencia nativa; sin dependencias externas; escala a 1M/s con Kafka cuando sea necesario |
+| Autenticación | JWT (golang-jwt) | Stateless, escalable, estándar de la industria |
+| Testing | testify + k6 | Pruebas unitarias e integración con testify; carga y E2E con k6 |
+| Logging | slog (stdlib) | Logging estructurado sin dependencias externas |
+| Validación | go-playground/validator | Validación por struct tags; integrado con el binder de Echo |
+| Observabilidad | Prometheus + Grafana + cAdvisor | Métricas de negocio personalizadas; dashboards pre-aprovisionados |
+| Documentación API | Swagger / swaggo | OpenAPI 2.0 autogenerado desde anotaciones en el código |
+| Contenedores | Docker + Docker Compose | Entorno reproducible para desarrollo local |
 
 ---
 
-## Design Decisions
+## Decisiones de diseño
 
-### 1. Per-Shipment Channel Architecture
+### 1. Per-Shipment Channel — canal por envío
 
-**Problem:** How to process 10K events/second concurrently while guaranteeing events for the same shipment are processed in order?
+**Problema:** Procesar 10K eventos por segundo de forma concurrente garantizando que los eventos del mismo envío se procesen en orden.
 
-**Solution:** Separate Go channel per `tracking_number`
+**Solución:** Un canal de Go independiente por `tracking_number`.
+
 ```
-shipment_1: [event1] → [event2] → [event3]  (SERIALIZED)
-shipment_2: [eventA] → [eventB]              (SERIALIZED)
-shipment_3: [eventX]                         (SERIALIZED)
+shipment_1: [event1] → [event2] → [event3]   (serial, en orden)
+shipment_2: [eventA] → [eventB]               (serial, en orden)
+shipment_3: [eventX]                          (serial, en orden)
 
-All shipments process in PARALLEL
-Each shipment's events in ORDER
+Todos los envíos se procesan en PARALELO entre sí.
+Los eventos de un mismo envío se procesan en ORDEN garantizado.
 ```
 
-**Implementation Details:**
-- `map[tracking_number]chan *Event` with `sync.RWMutex`
-- Lazy channel creation on first event
-- Worker goroutine spawned per channel
-- Channel buffer size: 100 (backpressure handling)
+**Implementación:**
+- `map[tracking_number]chan *Event` protegido con `sync.RWMutex`
+- Canal creado de forma lazy al primer evento del envío
+- Una goroutine worker por canal; buffer de 100 (backpressure)
 
-**Trade-off:**
-- ✅ Guarantee order per shipment
-- ✅ Parallelism across shipments
-- ✅ No external dependencies
-- ⚠️ Max shipments = memory available (mitigated by pooling inactive channels)
+**Trade-offs:**
+- Ordenamiento garantizado por envío
+- Paralelismo total entre envíos distintos
+- Sin dependencias externas
+- El número de envíos activos está limitado por memoria disponible (mitigado con pooling de canales inactivos)
 
 ---
 
-### 2. Idempotency Strategy
+### 2. Estrategia de idempotencia
 
-**Problem:** Duplicate events from retries or network issues must be handled safely
+**Problema:** Los eventos duplicados por reintentos o problemas de red deben manejarse de forma segura.
 
-**Solution:** Composite key deduplication in Redis + Idempotency table in MongoDB
+**Solución:** Deduplicación por clave compuesta en Redis + registro de auditoría en MongoDB.
 
 ```go
-// Redis: Fast check (SETEX atomic)
-key := fmt.Sprintf("dedup:%s:%s:%d", 
-    tracking_number, source, timestamp.Unix())
+// Clave de deduplicación en Redis (SETEX atómico)
+key := fmt.Sprintf("dedup:%s:%s:%d", tracking_number, source, timestamp.Unix())
 
-// If SET succeeds → new event → process
-// If SET fails → duplicate → skip
-
-// MongoDB: Long-term audit trail
-// (for explaining why event was skipped after Redis TTL expires)
+// Si SET tiene éxito → evento nuevo → procesar
+// Si SET falla    → duplicado     → descartar
 ```
 
-**Why this approach:**
-- ✅ Redis check is O(1) and very fast
-- ✅ TTL (1 hour) prevents memory bloat
-- ✅ MongoDB persistence for compliance/audit
-- ✅ Handles retries from different time windows
+La clave compuesta previene duplicados de la misma fuente en el mismo instante, pero permite que distintas fuentes actualicen el mismo envío simultáneamente y que la misma fuente envíe eventos en momentos distintos.
 
-**Composite Key Rationale:**
-```
-Key = tracking_number + source + timestamp
-      └─────────────────┬──────────────────┘
-      Prevents duplicates from SAME source at SAME time
-      But allows different sources updating same shipment simultaneously
-      And allows same source with different timestamps
-```
+- Verificación en Redis: O(1), muy baja latencia
+- TTL de 1 hora previene acumulación de memoria
+- Persistencia en MongoDB para auditoría y cumplimiento normativo
 
 ---
 
-### 3. State Machine Validation
+### 3. State machine — máquina de estados
 
-**Problem:** Prevent invalid status transitions (e.g., `delivered → in_warehouse`)
+**Problema:** Prevenir transiciones de estado inválidas (por ejemplo, `delivered → in_warehouse`).
 
-**Solution:** Whitelist of allowed transitions defined in domain
+**Solución:** Whitelist de transiciones permitidas definida exclusivamente en la capa de dominio.
 
 ```
-created        ──→ picked_up    ──→ in_warehouse ──→ in_transit ──→ delivered
-  ├─────────────────────────────────────────────────────────────────────┘
-  └─→ cancelled
-  
-picked_up ──→ cancelled
-in_warehouse ──→ cancelled
-in_transit ──→ cancelled
+created → picked_up → in_warehouse → in_transit → delivered
+    └──────────────────────────────────────────→ cancelled
+
+picked_up    → cancelled
+in_warehouse → cancelled
+in_transit   → cancelled
 ```
 
-**Implementation:**
 ```go
 var validTransitions = map[Status][]Status{
-    Created:    {PickedUp, Cancelled},
-    PickedUp:   {InWarehouse, Cancelled},
+    Created:     {PickedUp, Cancelled},
+    PickedUp:    {InWarehouse, Cancelled},
     InWarehouse: {InTransit, Cancelled},
     InTransit:   {Delivered},
     Delivered:   {},
@@ -389,253 +206,179 @@ var validTransitions = map[Status][]Status{
 }
 ```
 
-**Senior touch:** This is domain logic (in `/internal/domain`), tested independently, not mixed with infrastructure.
+Esta lógica reside en `internal/domain/status.go` y se prueba de forma independiente, sin mezclarla con la infraestructura.
 
 ---
 
-### 4. API Response Strategy for Async Events
+### 4. Respuesta asíncrona — 202 Accepted
 
-**Problem:** Client submits event, system queues it asynchronously. How to respond?
+**Problema:** El cliente envía un evento que se encola de forma asíncrona. ¿Qué código HTTP responder?
 
-**Decision:** `202 Accepted` + event queued
+**Decisión:** `202 Accepted` con el evento encolado.
 
 ```http
 POST /events
-Content-Type: application/json
+→ HTTP/1.1 202 Accepted
 
 {
-  "tracking_number": "99M-ABC123",
-  "status": "in_transit",
-  "timestamp": "2025-02-12T15:04:05Z",
-  "source": "driver_app",
-  "location": { "lat": 19.4326, "lng": -99.1332 }
-}
-
-HTTP/1.1 202 Accepted
-Content-Type: application/json
-
-{
-  "event_id": "evt_123xyz",
+  "event_id": "evt_xyz123",
   "status": "queued",
-  "tracking_number": "99M-ABC123",
+  "tracking_number": "99M-ABC12345",
   "message": "Event accepted for processing"
 }
 ```
 
-**Why 202?**
-- Standard for asynchronous processing
-- Client knows request received but not processed yet
-- No false guarantees
-
-**Why NOT:**
-- ❌ 200 OK: Implies processing complete
-- ❌ 201 Created: Implies resource created (misleading)
+- `202` es el estándar HTTP para procesamiento asíncrono: indica que la solicitud fue recibida pero aún no procesada.
+- `200 OK` implicaría procesamiento completo (incorrecto en este contexto).
+- `201 Created` implicaría creación de recurso (engañoso).
 
 ---
 
-### 5. Database Denormalization
+### 5. Desnormalización del historial de estados
 
-**Problem:** Queries like `GET /shipments/123` need shipment + complete history
+**Problema:** Las consultas `GET /shipments/:id` necesitan el envío y su historial completo en una sola llamada.
 
-**Decision:** Embed `status_history` array in shipment document
+**Decisión:** El array `status_history` se embebe directamente en el documento del envío.
 
-```javascript
-// ONE document with everything
-{
-  tracking_number: "99M-ABC123",
-  current_status: "in_transit",
-  status_history: [
-    { status: "created", timestamp: "...", source: "..." },
-    { status: "picked_up", timestamp: "...", source: "..." },
-    { status: "in_warehouse", timestamp: "...", source: "..." },
-    { status: "in_transit", timestamp: "...", source: "..." }
-  ]
-}
-```
-
-**Why:**
-- ✅ Single query = full history
-- ✅ ACID update (atomic)
-- ✅ Natural MongoDB use case
-- ⚠️ Array grows over time (mitigated by MongoDB array limits: 16MB per document)
-
-**Scaling consideration:** If histories grow huge (100K+ events per shipment), move to separate collection with linking.
+- Una sola consulta retorna el historial completo, sin joins.
+- Actualización atómica (ACID).
+- Uso natural del modelo de documentos de MongoDB.
+- Limitación: el documento crece con el tiempo (límite de 16 MB de MongoDB). Si los historiales superan los 100K eventos por envío, migrar a colección separada con `$lookup`.
 
 ---
 
-### 6. Authentication & Authorization
+### 6. Autenticación y autorización (RBAC)
 
-**Implementation:**
-- **Auth:** JWT tokens (seeded users in DB)
-- **Storage:** Bearer token in Authorization header
-- **Claims:** `sub` (username), `role` (client/admin), `client_id`
-- **Middleware:** Verify signature + extract claims on every protected endpoint
+**Implementación:**
+- Tokens JWT — stateless, sin sesión en servidor
+- Claims: `sub` (username), `role` (`client` / `admin`), `client_id`
+- El middleware verifica la firma y extrae los claims en cada endpoint protegido; los handlers confían en los claims del middleware
 
 **Roles:**
-```go
-type Role string
+- `client`: ve únicamente sus propios envíos, filtrado por el `client_id` del token
+- `admin`: ve todos los envíos, sin restricción de `client_id`
 
-const (
-    RoleClient Role = "client"  // See own shipments only
-    RoleAdmin  Role = "admin"   // See all shipments
-)
+**Usuarios pre-cargados en la base de datos:**
 
-// Middleware enforces
-GET /shipments?client_id=X
-  └─ client role: Only see shipments where client_id = token.client_id
-  └─ admin role: See all shipments (client_id filter ignored)
-```
-
-**Seeding:** Two pre-created users in MongoDB
-```javascript
-{
-  username: "admin_user",
-  password_hash: "bcrypt(...)",
-  role: "admin",
-  api_key: "admin_key_123"
-}
-
-{
-  username: "client_user_001",
-  password_hash: "bcrypt(...)",
-  role: "client",
-  client_id: "client_001",
-  api_key: "client_key_123"
-}
-```
+| Usuario | Contraseña | Rol | client_id |
+|---------|-----------|-----|-----------|
+| `admin_user` | `password123` | admin | — |
+| `client_user_001` | `password123` | client | `client_001` |
 
 ---
 
-## Getting Started
+## 🚀 Inicio rápido
 
-### Prerequisites
+### Requisitos previos
 
-- **Go:** 1.21 or higher
-- **Docker & Docker Compose:** Latest versions
-- **Make:** (optional, but recommended)
-- **Postman:** For API testing (optional)
+- Go 1.21 o superior
+- Docker y Docker Compose
+- Make (recomendado)
 
-### Quick Start (5 minutes)
+### Opción A: Docker Compose (recomendado)
 
 ```bash
-# 1. Clone repository
+# 1. Clonar el repositorio
 git clone <repo-url>
-cd 99minutos-shipment-api
+cd 99minutos
 
-# 2. Create environment file
-cp configs/.env.example configs/.env
+# 2. Levantar todos los servicios (MongoDB, Redis, API)
+make docker-up
 
-# 3. Start all services
-docker compose -f deployments/docker-compose.yaml up -d
-
-# 4. Verify services are running
-docker compose -f deployments/docker-compose.yaml ps
-
-# 5. Test API
-curl -X POST http://localhost:8080/health
+# 3. Verificar que la API responde
+curl http://localhost:8080/health
+# → {"status":"ok"}
 ```
 
-### Detailed Setup
-
-#### Option A: Using Docker Compose (Recommended)
+### Opción B: Desarrollo local (solo infraestructura en Docker)
 
 ```bash
-# Start services (MongoDB, Redis, API)
-docker compose -f deployments/docker-compose.yaml up -d
+# Levantar solo MongoDB y Redis
+docker compose up -d mongo redis
 
-# View logs
-docker compose -f deployments/docker-compose.yaml logs -f api
-
-# Stop services
-docker compose -f deployments/docker-compose.yaml down
-
-# Clean up (including volumes)
-docker compose -f deployments/docker-compose.yaml down -v
-```
-
-#### Option B: Local Development (with Docker services only)
-
-```bash
-# Start MongoDB and Redis
-docker compose -f deployments/docker-compose.yaml up -d mongo redis
-
-# Install dependencies
+# Instalar dependencias
 go mod download
 
-# Run server
-go run ./cmd/server/main.go
-
-# Run tests
-go test ./... -v
+# Ejecutar el servidor (carga configs/.env.local)
+make run
 ```
 
-### Environment Configuration
+### Variables de entorno
 
-Create `configs/.env` file:
+Copiar la plantilla y ajustar los valores:
+
+```bash
+cp configs/.env.example configs/.env
+```
 
 ```env
-# Server
 PORT=8080
 ENV=development
 
-# MongoDB
 MONGO_URI=mongodb://mongo:27017
 MONGO_DB=shipping_system
 
-# Redis
 REDIS_ADDR=redis:6378
 REDIS_DB=0
 
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
+JWT_SECRET=change-me-in-production
 
-# Logging
 LOG_LEVEL=info
 ```
 
-### Verify Installation
+### Verificar la instalación
 
 ```bash
-# Check MongoDB
-docker compose -f deployments/docker-compose.yaml exec mongo mongosh --eval "db.version()"
+# MongoDB
+docker compose exec mongo mongosh --eval "db.version()"
 
-# Check Redis
-docker compose -f deployments/docker-compose.yaml exec redis redis-cli ping
-# Expected: PONG
+# Redis
+docker compose exec redis redis-cli ping
+# → PONG
 
-# Check API
+# API
 curl http://localhost:8080/health
-# Expected: {"status":"ok"}
-
-# List seeded users
-curl -X GET http://localhost:8080/auth/users \
-  -H "Authorization: Bearer <admin-token>"
+# → {"status":"ok"}
 ```
 
 ---
 
-## API Documentation
+## 📖 Documentación de la API
 
-### Authentication
+### Swagger UI
 
-All protected endpoints require JWT token in `Authorization` header:
+La API incluye una especificación OpenAPI 2.0 generada con [swaggo](https://github.com/swaggo/swag).
+
+| URL | Descripción |
+|-----|-------------|
+| `http://localhost:8080/swagger/index.html` | Swagger UI interactivo |
+| `http://localhost:8080/swagger/doc.json` | Especificación OpenAPI en JSON |
+
+Para regenerar la especificación tras modificar las anotaciones de los handlers:
 
 ```bash
-curl -X GET http://localhost:8080/shipments \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+make swagger
 ```
 
-**Getting a Token:**
+---
+
+### Autenticación
+
+Todos los endpoints protegidos requieren un token JWT en el header `Authorization`:
+
+```bash
+Authorization: Bearer <token>
+```
+
+**Obtener token:**
 
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin_user",
-    "password": "password123"
-  }'
+  -d '{"username": "admin_user", "password": "password123"}'
+```
 
-# Response
+```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "expires_in": 86400,
@@ -643,17 +386,19 @@ curl -X POST http://localhost:8080/auth/login \
 }
 ```
 
+---
+
 ### Endpoints
 
-#### 1. Create Shipment
+#### Crear envío
 
 ```http
 POST /shipments
 Content-Type: application/json
-Authorization: Bearer <admin-token>
+Authorization: Bearer <token>
 
 {
-  "origin_address": "Calle 5 #123, Mexico City",
+  "origin_address": "Calle 5 #123, Ciudad de México",
   "origin_lat": 19.4326,
   "origin_lng": -99.1332,
   "destination_address": "Avenida Paseo #456, Puebla",
@@ -666,12 +411,13 @@ Authorization: Bearer <admin-token>
   "content_description": "Electronics",
   "client_id": "client_001"
 }
+```
 
+```http
 HTTP/1.1 201 Created
-Content-Type: application/json
 
 {
-  "tracking_number": "99M-ABC123XYZ",
+  "tracking_number": "99M-ABC12345",
   "status": "created",
   "created_at": "2025-02-12T10:00:00Z",
   "client_id": "client_001"
@@ -680,21 +426,22 @@ Content-Type: application/json
 
 ---
 
-#### 2. Get Shipment Details
+#### Consultar envío
 
 ```http
-GET /shipments/99M-ABC123XYZ
+GET /shipments/99M-ABC12345
 Authorization: Bearer <token>
+```
 
+```http
 HTTP/1.1 200 OK
-Content-Type: application/json
 
 {
-  "tracking_number": "99M-ABC123XYZ",
+  "tracking_number": "99M-ABC12345",
   "client_id": "client_001",
   "current_status": "in_transit",
   "origin": {
-    "address": "Calle 5 #123, Mexico City",
+    "address": "Calle 5 #123, Ciudad de México",
     "coordinates": { "lat": 19.4326, "lng": -99.1332 }
   },
   "destination": {
@@ -709,55 +456,35 @@ Content-Type: application/json
   "created_at": "2025-02-12T10:00:00Z",
   "updated_at": "2025-02-12T15:04:05Z",
   "status_history": [
-    {
-      "status": "created",
-      "timestamp": "2025-02-12T10:00:00Z",
-      "source": "api",
-      "location": null
-    },
-    {
-      "status": "picked_up",
-      "timestamp": "2025-02-12T10:15:00Z",
-      "source": "driver_app",
-      "location": { "lat": 19.4327, "lng": -99.1331 }
-    },
-    {
-      "status": "in_warehouse",
-      "timestamp": "2025-02-12T12:30:00Z",
-      "source": "warehouse_scanner",
-      "location": null
-    },
-    {
-      "status": "in_transit",
-      "timestamp": "2025-02-12T15:04:05Z",
-      "source": "driver_app",
-      "location": { "lat": 19.4326, "lng": -99.1332 }
-    }
+    { "status": "created",      "timestamp": "2025-02-12T10:00:00Z", "source": "api",               "location": null },
+    { "status": "picked_up",    "timestamp": "2025-02-12T10:15:00Z", "source": "driver_app",        "location": { "lat": 19.4327, "lng": -99.1331 } },
+    { "status": "in_warehouse", "timestamp": "2025-02-12T12:30:00Z", "source": "warehouse_scanner", "location": null },
+    { "status": "in_transit",   "timestamp": "2025-02-12T15:04:05Z", "source": "driver_app",        "location": { "lat": 19.4326, "lng": -99.1332 } }
   ]
 }
 ```
 
 ---
 
-#### 3. List Shipments
+#### Listar envíos
 
 ```http
 GET /shipments?status=in_transit&limit=10&offset=0
 Authorization: Bearer <token>
+```
 
+```http
 HTTP/1.1 200 OK
-Content-Type: application/json
 
 {
   "data": [
     {
-      "tracking_number": "99M-ABC123XYZ",
+      "tracking_number": "99M-ABC12345",
       "client_id": "client_001",
       "current_status": "in_transit",
       "created_at": "2025-02-12T10:00:00Z",
       "updated_at": "2025-02-12T15:04:05Z"
-    },
-    // ... more shipments
+    }
   ],
   "pagination": {
     "total": 45,
@@ -768,63 +495,64 @@ Content-Type: application/json
 }
 ```
 
-**Query Parameters:**
-- `status`: Filter by status (created, picked_up, in_warehouse, in_transit, delivered, cancelled)
-- `client_id`: Filter by client (admin only, overrides token's client_id)
-- `limit`: Results per page (default: 10, max: 100)
-- `offset`: Pagination offset (default: 0)
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `status` | string | `created`, `picked_up`, `in_warehouse`, `in_transit`, `delivered`, `cancelled` |
+| `client_id` | string | Filtrar por cliente (solo role: `admin`) |
+| `limit` | int | Resultados por página (default: 10, max: 100) |
+| `offset` | int | Desplazamiento para paginación (default: 0) |
 
 ---
 
-#### 4. Post Single Event
+#### Publicar evento
 
 ```http
 POST /events
 Content-Type: application/json
-Authorization: Bearer <driver-token>
+Authorization: Bearer <token>
 
 {
-  "tracking_number": "99M-ABC123XYZ",
+  "tracking_number": "99M-ABC12345",
   "status": "in_transit",
   "timestamp": "2025-02-12T15:04:05Z",
   "source": "driver_app",
-  "location": {
-    "lat": 19.4326,
-    "lng": -99.1332
-  }
+  "location": { "lat": 19.4326, "lng": -99.1332 }
 }
+```
 
+```http
 HTTP/1.1 202 Accepted
-Content-Type: application/json
 
 {
   "event_id": "evt_xyz123abc",
   "status": "queued",
-  "tracking_number": "99M-ABC123XYZ",
+  "tracking_number": "99M-ABC12345",
   "message": "Event accepted for processing"
 }
 ```
 
 ---
 
-#### 5. Post Batch Events
+#### Publicar lote de eventos
 
 ```http
 POST /events/batch
 Content-Type: application/json
-Authorization: Bearer <admin-token>
+Authorization: Bearer <token>
 
 {
   "events": [
     {
-      "tracking_number": "99M-ABC123XYZ",
+      "tracking_number": "99M-ABC12345",
       "status": "in_transit",
       "timestamp": "2025-02-12T15:04:05Z",
       "source": "driver_app",
       "location": { "lat": 19.4326, "lng": -99.1332 }
     },
     {
-      "tracking_number": "99M-DEF456UVW",
+      "tracking_number": "99M-DEF45678",
       "status": "picked_up",
       "timestamp": "2025-02-12T15:05:00Z",
       "source": "driver_app",
@@ -832,9 +560,10 @@ Authorization: Bearer <admin-token>
     }
   ]
 }
+```
 
+```http
 HTTP/1.1 202 Accepted
-Content-Type: application/json
 
 {
   "received": 2,
@@ -845,13 +574,14 @@ Content-Type: application/json
 
 ---
 
-#### 6. Health Check
+#### Health check
 
 ```http
 GET /health
+```
 
+```http
 HTTP/1.1 200 OK
-Content-Type: application/json
 
 {
   "status": "ok",
@@ -866,9 +596,9 @@ Content-Type: application/json
 
 ---
 
-### Error Responses
+### Códigos de respuesta y errores
 
-All errors follow this format:
+Todos los errores siguen este formato:
 
 ```json
 {
@@ -879,651 +609,337 @@ All errors follow this format:
 }
 ```
 
-**Common Status Codes:**
-
-| Code | Meaning | Example |
-|------|---------|---------|
-| 200 | OK | Successful GET request |
-| 201 | Created | Shipment created successfully |
-| 202 | Accepted | Event queued for processing |
-| 400 | Bad Request | Invalid JSON or missing fields |
-| 401 | Unauthorized | Missing/invalid token |
-| 403 | Forbidden | Client viewing another client's shipment |
-| 404 | Not Found | Shipment tracking_number not found |
-| 409 | Conflict | Invalid state transition |
-| 500 | Internal Server Error | Unexpected server error |
+| Código | Significado | Ejemplo |
+|--------|-------------|---------|
+| 200 | OK | GET exitoso |
+| 201 | Created | Envío creado |
+| 202 | Accepted | Evento encolado para procesamiento asíncrono |
+| 400 | Bad Request | JSON inválido o campos faltantes |
+| 401 | Unauthorized | Token ausente o inválido |
+| 403 | Forbidden | Cliente intentando ver envíos de otro cliente |
+| 404 | Not Found | Número de rastreo no encontrado |
+| 409 | Conflict | Transición de estado inválida |
+| 500 | Internal Server Error | Error inesperado del servidor |
 
 ---
 
-## Testing
+## Pruebas
 
-### Running Tests
+El proyecto cuenta con dos capas de pruebas complementarias: pruebas Go (unitarias e integración) y pruebas black-box con k6 sobre la API en ejecución.
+
+### Pruebas Go
 
 ```bash
-# All tests
-go test ./... -v
+# Todas las pruebas
+go test ./...
 
-# Specific package
-go test ./internal/domain -v
+# Solo pruebas unitarias
+go test ./test/unit/... -v
 
-# With coverage
-go test ./... -v -cover
+# Con race detector (obligatorio antes de hacer commit)
+go test -race ./...
 
-# Coverage report (HTML)
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
+# Reporte de cobertura (HTML)
+go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html
 
-# Run race detector (concurrent issues)
-go test ./... -race
-
-# Benchmark
-go test ./... -bench=. -benchmem
+# Prueba específica por nombre
+go test ./test/unit/... -run TestValidTransitions -v
 ```
 
-### Test Structure
+Atajos con Make:
 
-```
-tests/
-├── unit/
-│   ├── domain/
-│   │   ├── shipment_test.go      # Entity logic
-│   │   └── status_test.go        # State machine validation
-│   ├── application/
-│   │   ├── create_shipment_test.go
-│   │   ├── process_event_test.go
-│   │   └── get_shipment_test.go
-│   └── infrastructure/
-│       ├── event_queue_test.go
-│       └── dedup_checker_test.go
-│
-├── integration/
-│   ├── api_test.go              # HTTP handler tests
-│   ├── mongodb_test.go          # Database integration
-│   └── concurrency_test.go      # Goroutine + channel tests
-│
-└── fixtures/
-    └── test_data.go             # Seeded test data
+```bash
+make test           # Ejecutar todas las pruebas
+make test-race      # Con race detector
+make test-coverage  # Generar reporte HTML
 ```
 
-### Key Test Scenarios
-
-#### 1. Domain - State Machine
-
-```go
-func TestValidTransitions(t *testing.T) {
-    tests := []struct {
-        from    Status
-        to      Status
-        allowed bool
-    }{
-        {Created, PickedUp, true},
-        {Created, Cancelled, true},
-        {Created, InTransit, false},    // Invalid
-        {InTransit, PickedUp, false},   // Invalid (backwards)
-        {Delivered, Cancelled, false},  // Invalid (terminal state)
-    }
-    
-    for _, tt := range tests {
-        t.Run(fmt.Sprintf("%s->%s", tt.from, tt.to), func(t *testing.T) {
-            err := ValidateTransition(tt.from, tt.to)
-            if tt.allowed {
-                assert.NoError(t, err)
-            } else {
-                assert.Error(t, err)
-            }
-        })
-    }
-}
-```
-
-#### 2. Integration - Concurrency
-
-```go
-func TestEventProcessingConcurrency(t *testing.T) {
-    // Create 3 shipments
-    shipments := createTestShipments(3)
-    
-    // Send 100 events total (mixed shipments)
-    events := generateConcurrentEvents(shipments, 100)
-    
-    // Process concurrently
-    for _, e := range events {
-        go processor.ProcessEvent(e)
-    }
-    
-    // Verify:
-    // - All events processed
-    // - Each shipment's history in order
-    // - No race conditions (run with -race flag)
-}
-```
-
-#### 3. Integration - Idempotency
-
-```go
-func TestIdempotencyHandling(t *testing.T) {
-    event := createTestEvent("99M-ABC123", "in_transit")
-    
-    // Send same event 5 times
-    for i := 0; i < 5; i++ {
-        result := processor.ProcessEvent(event)
-        assert.NoError(t, result.Error)
-    }
-    
-    // Verify shipment's history has event only ONCE
-    shipment := repo.GetShipment("99M-ABC123")
-    assert.Equal(t, 1, countEventInHistory(shipment, "in_transit"))
-}
-```
-
-### Coverage Target
-
-- **Domain logic:** 95%+ (critical business logic)
-- **Application layer:** 85%+ (use cases)
-- **Infrastructure:** 70%+ (external dependencies)
-- **Overall:** 80%+
+**Objetivos de cobertura:** dominio 95% · capa de aplicación 85% · infraestructura 70% · global 80%+
 
 ---
 
-## Scalability
+### Pruebas k6
 
-### Current Architecture Capacity
+Las pruebas k6 corren contra la API HTTP en ejecución. Cubren autenticación, envíos, eventos y el ciclo de vida completo (incluyendo idempotencia, aislamiento de RBAC, paginación y validación de la state machine).
+
+**Instalar k6:** https://k6.io/docs/get-started/installation/
+
+```bash
+# Requisito: la API debe estar en ejecución
+make docker-up
+```
+
+| Archivo | Alcance | Qué cubre |
+|---------|---------|-----------|
+| `test/k6/auth.test.js` | Integración | Login, validación de token, credenciales incorrectas, RBAC en rutas protegidas |
+| `test/k6/shipments.test.js` | Integración | Creación, consulta por número de rastreo, listado con paginación y filtros, aislamiento de RBAC |
+| `test/k6/events.test.js` | Integración | Evento único, batch, deduplicación, transiciones inválidas, casos límite de validación |
+| `test/k6/e2e.test.js` | End-to-end | Ciclo completo: crear envío → recorrer las 5 transiciones → verificar historial en cada paso → aislamiento RBAC |
+
+```bash
+make test-k6        # Ejecutar todas las suites k6
+make test-k6-e2e    # Solo el escenario end-to-end
+
+# Contra un entorno diferente
+BASE_URL=http://staging.example.com k6 run test/k6/e2e.test.js
+```
+
+**Thresholds por defecto** (definidos en `test/k6/config.js`):
+
+```
+http_req_failed       < 1%     (tasa de error)
+http_req_duration p95 < 3s     (latencia)
+checks                = 100%   (todas las aserciones deben pasar)
+```
+
+---
+
+## 📊 Observabilidad
+
+Todos los servicios de observabilidad arrancan automáticamente con `make docker-up`. No se requiere configuración adicional.
+
+### URLs
+
+| Servicio | URL | Credenciales |
+|---------|-----|-------------|
+| Grafana | `http://localhost:3000` | admin / admin |
+| Prometheus | `http://localhost:9090` | — |
+| cAdvisor | `http://localhost:8081` | — |
+| Métricas API | `http://localhost:8080/metrics` | — |
+
+### Dashboard de Grafana
+
+El dashboard `deployments/grafana/dashboards/shipping_api.json` se provisiona automáticamente al arrancar. Incluye:
+
+**Capa HTTP**
+- Throughput (req/s) por método, URL y código de estado
+- Latencia p50 / p95 / p99 por endpoint
+- Tasa de error (4xx + 5xx)
+
+**Pipeline de procesamiento de eventos**
+- Eventos procesados/s por estado y fuente
+- Duración de procesamiento p50 / p95
+- Profundidad de cola por worker
+- Tasa de hits de deduplicación
+- Envíos creados/s
+
+**Go runtime**
+- Goroutines y OS threads (detección de leaks)
+- Duración de GC p50 / p99
+
+**Recursos del proceso**
+- CPU (%), RSS memory (MB)
+- Go heap: allocado vs reservado
+
+### Métricas Prometheus personalizadas
+
+| Métrica | Tipo | Labels |
+|--------|------|--------|
+| `shipping_http_requests_total` | Counter | `method`, `url`, `code` |
+| `shipping_http_request_duration_seconds` | Histogram | `method`, `url` |
+| `shipping_events_processed_total` | Counter | `status`, `source` |
+| `shipping_events_errors_total` | Counter | `reason` |
+| `shipping_events_dedup_total` | Counter | `result` |
+| `shipping_events_queue_depth` | Gauge | `worker_id` |
+| `shipping_event_processing_duration_seconds` | Histogram | `status` |
+| `shipping_shipments_created_total` | Counter | `service_type` |
+
+---
+
+## Escalabilidad
+
+### Capacidad actual
 
 ```
 Go Channels + 10 Workers:
-├─ Throughput: ~1,000,000 events/second
-├─ Latency (p50): 50-100ms
-├─ Latency (p99): 200-500ms
-├─ Memory per 10K events: ~50MB
-└─ CPU per 10K/s: ~1 core (modern CPU)
-
-✅ PLENTY OF HEADROOM for 10K/s requirement
+├─ Throughput:        ~1,000,000 eventos/segundo
+├─ Latencia p50:      50–100 ms
+├─ Latencia p99:      200–500 ms
+├─ Memoria (10K ev):  ~50 MB
+└─ CPU (10K ev/s):    ~1 núcleo
 ```
 
-### Scaling Phases
+La arquitectura actual tiene margen amplio para el target de 10K eventos/segundo.
 
-#### Phase 1: Current (10K - 100K events/sec)
-**Status:** ✅ Ready
+### Fases de escalado
 
-- Go channels with worker pool
-- Single MongoDB instance + replication
+#### Fase 1: Actual (10K – 100K eventos/s)
+
+- Go channels con worker pool
+- Instancia única de MongoDB con replicación
 - Redis standalone
-- Single API instance
+- Instancia única de la API
 
-**Deployment:** Docker Compose or Kubernetes
+Despliegue: Docker Compose o Kubernetes.
 
 ---
 
-#### Phase 2: High Volume (100K - 1M events/sec)
+#### Fase 2: Alto volumen (100K – 1M eventos/s)
 
-**Replace components:**
+Componentes a reemplazar:
 
-1. **Message Queue:** Go Channels → Apache Kafka
-   ```go
-   // Current
-   eventQueue.Enqueue(event)  // Channels
-   
-   // Future
-   kafkaProducer.Send(event)  // Kafka (topic per partition strategy)
-   ```
+1. **Cola de mensajes:** Go Channels → Apache Kafka (topic por partición, ordenamiento por `tracking_number` como partition key)
+2. **Base de datos:** MongoDB single node → MongoDB Cluster con sharding por `tracking_number`
+3. **Cache:** Redis standalone → Redis Cluster
+4. **API:** Instancia única → Múltiples instancias detrás de un Load Balancer
 
-2. **Database:** Single MongoDB → MongoDB Cluster + Sharding
-   ```javascript
-   db.shipments.createIndex({ tracking_number: 1 }, { unique: true })
-   sh.shardCollection("shipping_db.shipments", { tracking_number: 1 })
-   ```
+La abstracción de la cola permite cambiar la implementación sin modificar los handlers:
 
-3. **Cache:** Redis Standalone → Redis Cluster
-   ```
-   cluster create 127.0.0.1:7000 ... 127.0.0.1:7005 --cluster-replicas 1
-   ```
-
-4. **API:** Single instance → Multiple instances + Load Balancer
-   ```yaml
-   # Kubernetes deployment
-   replicas: 3
-   loadBalancer:
-     type: CLusterIP
-   ```
-
-**Code changes minimal** (abstraction layer for queue/cache):
 ```go
 type EventPublisher interface {
     Publish(ctx context.Context, event *Event) error
 }
 
-// Switch implementation without changing handlers
-var publisher EventPublisher = &ChannelPublisher{}    // Dev
-var publisher EventPublisher = &KafkaPublisher{}      // Prod
+var publisher EventPublisher = &ChannelPublisher{}  // Desarrollo
+var publisher EventPublisher = &KafkaPublisher{}    // Producción
 ```
 
 ---
 
-#### Phase 3: Extreme Scale (1M+ events/sec)
+#### Fase 3: Escala extrema (1M+ eventos/s)
 
-**Advanced patterns:**
+Patrones avanzados a considerar:
 
-```
-1. EVENT SOURCING
-   ├─ Events = source of truth (immutable log)
-   ├─ Projections = read models (denormalized)
-   └─ CQRS = separate read/write concerns
-
-2. TIME-SERIES DB
-   ├─ Location tracking → ClickHouse or TimescaleDB
-   ├─ Metrics/analytics separate from transactional data
-   └─ Better compression for large volumes
-
-3. DISTRIBUTED TRACING
-   ├─ Jaeger for request tracing
-   ├─ Find bottlenecks in pipeline
-   └─ 0.1% sampling for production
-
-4. MICROSERVICES
-   ├─ Shipment Service
-   ├─ Event Processor Service
-   ├─ Analytics Service
-   └─ Async via Kafka topics
-
-Example Kafka Topic Strategy:
-shipments.events         → All events (1M/s) 
-shipments.created        → Filter for analytics
-shipments.delivered      → Filter for reporting
-shipments.location       → Stream to time-series DB
-```
+- **Event Sourcing:** los eventos son la fuente de verdad; las proyecciones son modelos de lectura desnormalizados
+- **CQRS:** separación de escrituras y lecturas en modelos independientes
+- **Time-series DB:** rastreo de ubicaciones con ClickHouse o TimescaleDB
+- **Distributed Tracing:** Jaeger con sampling del 0.1% en producción
+- **Microservicios:** Shipment Service, Event Processor Service y Analytics Service comunicados vía Kafka topics
 
 ---
 
-### Scaling Checklist
+## Trade-offs y consideraciones de producción
 
-**If adding Kafka:**
-```go
-// Ensure ordering by partition key
-event := &Event{
-    TrackingNumber: "99M-ABC123",
-    // ...
-}
+### 1. Consistencia eventual vs. consistencia fuerte
 
-msg := &sarama.ProducerMessage{
-    Topic: "shipments.events",
-    Key:   sarama.StringEncoder(event.TrackingNumber),  // ← Key per-shipment
-    Value: sarama.StringEncoder(marshalled),
-}
+**Decisión adoptada:** Consistencia eventual con latencia acotada.
 
-producer.SendMessage(msg)  // Order guaranteed per partition
+```
+El cliente envía el evento:
+├─ Respuesta:         202 Accepted (inmediata)
+└─ Procesamiento:     asíncrono (~50–100 ms)
 ```
 
-**If sharding MongoDB:**
-```javascript
-// Sharding key: tracking_number (already unique)
-// Ensures related events go to same shard
-// No need for distributed transactions
+Se eligió consistencia eventual porque mejora el throughput, es el estándar en sistemas distribuidos, el cliente puede hacer polling para confirmar el estado, y los errores se manejan con una dead-letter queue.
 
-db.shipments.updateOne(
-  { tracking_number: "99M-ABC123" },
-  { $push: { status_history: event } }
-)
-// All reads/writes for this tracking_number go to same shard ✅
-```
-
-**Kubernetes deployment example:**
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: shipping-api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: shipping-api
-  template:
-    metadata:
-      labels:
-        app: shipping-api
-    spec:
-      containers:
-      - name: api
-        image: shipping-system:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: KAFKA_BROKERS
-          value: "kafka-0.kafka-headless:9092"
-        resources:
-          requests:
-            cpu: 500m
-            memory: 256Mi
-          limits:
-            cpu: 1000m
-            memory: 512Mi
-```
+La alternativa sincrónica ofrece mayor certeza inmediata pero a costa de mayor latencia, menor throughput y mayor complejidad en la lógica de reintentos.
 
 ---
 
-## Trade-offs & Production Considerations
+### 2. Historial embebido vs. colección separada
 
-### Trade-off 1: Eventual Consistency vs Strong Consistency
+**Decisión adoptada:** `status_history` embebido en el documento del envío.
 
-**What we chose:** Eventual consistency with bounded delay
+Ventajas: una sola consulta retorna el historial completo; actualización atómica (ACID).  
+Limitación: el documento crece con el tiempo (límite de 16 MB en MongoDB).
 
-```
-Client submits event:
-├─ Response: 202 Accepted (immediately)
-└─ Processing: Async (50-100ms typical)
-
-After 100ms, shipment status guaranteed updated
-```
-
-**Alternative:** Strong consistency (synchronous processing)
-```
-Client submits event:
-├─ Processing: Sync (blocking)
-└─ Response: 200/409 (after validation)
-
-✅ Immediate certainty
-❌ Higher latency (100+ ms per event)
-❌ Reduces throughput
-❌ Complexity with retry logic
-```
-
-**Why eventual consistency:**
-- Better throughput (10K/s → 100K+/s easier)
-- Standard for distributed systems
-- Client can poll for confirmation if needed
-- Error handling via dead-letter queue
+Migración futura cuando sea necesario: mover el historial a la colección `status_events` y unir con `$lookup` en las consultas de lectura.
 
 ---
 
-### Trade-off 2: Memory vs Performance (Event History)
+### 3. Redis para deduplicación vs. caché en memoria
 
-**Current:** Embed status_history in shipment document
+**Decisión adoptada:** Redis para deduplicación + MongoDB para persistencia.
 
-```javascript
-shipment: {
-  tracking_number: "99M-ABC123",
-  status_history: [  // Embedded array
-    { status: "created", ... },
-    { status: "picked_up", ... },
-    { status: "in_warehouse", ... },
-    // ...
-  ]
-}
-```
+Alternativa descartada (caché en memoria de la aplicación): se pierde al reiniciar, no escala a múltiples instancias y la memoria no está acotada.
 
-**Pros:** Single query, ACID updates
-**Cons:** Document grows, array limit (16MB MongoDB)
-
-**Future (when needed):**
-```javascript
-// Two collections
-shipments: {
-  _id: ObjectId,
-  tracking_number: "99M-ABC123",
-  current_status: "in_transit"
-}
-
-status_events: {
-  _id: ObjectId,
-  shipment_id: ObjectId,
-  status: "picked_up",
-  timestamp: ISODate(),
-  source: "driver_app"
-}
-
-// Query with $lookup for history (slight performance cost)
-db.shipments.aggregate([
-  { $match: { tracking_number: "99M-ABC123" } },
-  { $lookup: {
-      from: "status_events",
-      localField: "_id",
-      foreignField: "shipment_id",
-      as: "status_history"
-    }
-  }
-])
-```
+El costo operacional de Redis es bajo y los beneficios son claros.
 
 ---
 
-### Trade-off 3: Operational Complexity vs Flexibility
-
-**Current:** Redis + MongoDB for dedup/persistence
+## Estructura del proyecto
 
 ```
-✅ Two systems → flexibility
-   - Can update TTL independently
-   - Can failover independently
-❌ Two systems → operational complexity
-   - Two databases to monitor
-   - Replication/backup of both
-   - More infrastructure
-```
-
-**Alternative:** Dedup in application memory (NOT recommended)
-```go
-var processedEvents = make(map[string]bool)  // In-memory cache
-
-// Problem: Lost on restart
-// Problem: Doesn't scale (one instance only)
-// Problem: Memory unbounded
-```
-
-**Our stance:** Redis cost is low, benefits clear → worth it
-
----
-
-### Production Checklist
-
-```
-BEFORE GOING LIVE
-═══════════════════════════════════════════════════════
-
-SECURITY
-  ☐ JWT secret from environment (not hardcoded)
-  ☐ Password hashing: bcrypt (not plaintext)
-  ☐ HTTPS enforced (TLS cert)
-  ☐ CORS configured (not * wildcard)
-  ☐ Rate limiting per IP/user
-  ☐ SQL injection proof (parameterized queries)
-  ☐ No sensitive data in logs
-
-RELIABILITY
-  ☐ Database backups automated (hourly)
-  ☐ Replica set for MongoDB (3 nodes minimum)
-  ☐ Redis persistence enabled (RDB + AOF)
-  ☐ Health checks (K8s liveness/readiness)
-  ☐ Circuit breaker for external calls
-  ☐ Dead-letter queue for failed events
-  ☐ Graceful shutdown (drain in-flight requests)
-
-OBSERVABILITY
-  ☐ Structured logging (JSON format)
-  ☐ Metrics collection (Prometheus)
-  ☐ Distributed tracing (Jaeger)
-  ☐ Error tracking (Sentry/Rollbar)
-  ☐ Alerts for critical conditions
-  ☐ Dashboards (Grafana)
-
-PERFORMANCE
-  ☐ Load testing (k6 or Locust)
-  ☐ Benchmark critical paths
-  ☐ Database indexes optimized
-  ☐ Query optimization (explain plans)
-  ☐ Connection pooling configured
-  ☐ Caching strategy validated
-
-DEPLOYMENT
-  ☐ Infrastructure as Code (Terraform)
-  ☐ CI/CD pipeline (GitHub Actions)
-  ☐ Automated tests in pipeline
-  ☐ Blue-green deployment strategy
-  ☐ Canary deployments (1% → 10% → 100%)
-  ☐ Rollback procedure documented
-
-MAINTENANCE
-  ☐ Database cleanup job (old events)
-  ☐ Log rotation configured
-  ☐ Documentation up-to-date
-  ☐ On-call runbook prepared
-  ☐ Incident response plan
-```
-
----
-
-### Known Limitations & Future Work
-
-| Limitation | Current | Future Solution | Priority |
-|-----------|---------|-----------------|----------|
-| Single MongoDB instance | Works for 10K/s | Replica set → Sharding | High |
-| In-memory event queue | Max ~100K events in buffer | Kafka topic | Medium |
-| No distributed tracing | Basic logs only | Jaeger integration | Medium |
-| No rate limiting | Could be abused | Token bucket per client | High |
-| No audit logging | Events logged, not immutable | Event sourcing | Low |
-| No multi-region support | Single datacenter | Geo-replication | Low |
-
----
-
-## Project Structure
-
-```
-99minutos-shipment-api/
+99minutos/
 ├── api/
-│   └── postman/                    # Postman collection or .http files
+│   └── postman/                    # Colección Postman / archivos .http
 ├── cmd/
 │   └── server/
-│       └── main.go                 # Entry point: wire config, router, deps
+│       └── main.go                 # Entry point: wiring de config, router y dependencias
 ├── configs/
-│   ├── .env                        # Local environment (not committed)
-│   └── .env.example                # Template
+│   ├── .env                        # Variables de entorno locales (no versionado)
+│   └── .env.example                # Plantilla de variables de entorno
 ├── deployments/
-│   └── docker-compose.yaml         # Local dev: MongoDB, Redis, API
+│   └── grafana/                    # Dashboards y datasources de Grafana
+├── docs/
+│   └── *.svg                       # Diagramas de arquitectura
 ├── internal/
 │   ├── api/
-│   │   ├── handler/                # HTTP handlers (shipments, events, health)
-│   │   └── middleware/             # Auth/RBAC, logging
-│   ├── core/
-│   │   ├── domain/                 # Entities + status transitions
-│   │   ├── ports/                  # Interfaces for repos/use cases
-│   │   └── service/                # Use cases / business services
-│   ├── infrastructure/
-│   │   ├── db/
-│   │   │   ├── mongo/              # MongoDB client
-│   │   │   └── redis/              # Redis client
-│   │   └── queue/                  # Async processing and concurrency
-│   └── pkg/
-│       ├── config/                 # Env loader (go-envconfig)
-│       └── logger/                 # Zerolog-based logger
+│   │   ├── handler/                # HTTP handlers (envíos, eventos, health)
+│   │   ├── middleware/             # Autenticación / RBAC
+│   │   └── router.go               # Registro de rutas
+│   ├── domain/                     # Entidades de negocio + máquina de estados
+│   ├── application/                # Casos de uso + DTOs
+│   └── infrastructure/
+│       ├── db/
+│       │   ├── mongo/              # Cliente y repositorio MongoDB
+│       │   └── redis/              # Verificación de idempotencia en Redis
+│       └── queue/                  # Cola asíncrona y worker pool
 ├── scripts/
-│   └── mongo-init.js               # Mongo seed script
+│   └── mongo-init.js               # Seed script de MongoDB
 ├── test/
 │   ├── fixtures/
 │   ├── integration/
-│   └── unit/
-├── Dockerfile                      # Container image
-├── Makefile                        # Common tasks
-├── go.mod / go.sum                 # Dependencies
-└── README.md                       # This file
+│   ├── k6/                         # Pruebas de carga y E2E con k6
+│   └── unit/                       # Pruebas unitarias Go
+├── docker-compose.yaml
+├── Dockerfile
+├── Makefile
+├── go.mod
+├── go.sum
+└── README.md
 ```
 
 ---
 
-## Development Commands
-
-### Makefile Shortcuts
-
-```makefile
-make help          # Show all commands
-make build         # Build binary
-make run           # Run locally (requires services)
-make test          # Run all tests
-make test-race     # Run tests with race detector
-make test-coverage # Generate coverage report
-make docker-up     # Start services (deployments/docker-compose.yaml)
-make docker-down   # Stop services
-make docker-logs   # View logs
-make lint          # Run linter (golangci-lint)
-make fmt           # Format code
-make deps          # Update dependencies
-make clean         # Clean build artifacts
-```
-
-### Example Workflow
+## Comandos de desarrollo
 
 ```bash
-# 1. Start services
-make docker-up
+make help           # Muestra todos los comandos disponibles
+make build          # Compila el binario en ./bin/server
+make run            # Ejecuta el servidor localmente (requiere servicios)
+make test           # Ejecuta todas las pruebas
+make test-race      # Ejecuta pruebas con race detector
+make test-coverage  # Genera reporte de cobertura HTML
+make test-k6        # Ejecuta todas las suites k6
+make docker-up      # Levanta MongoDB, Redis y la API
+make docker-down    # Detiene los servicios
+make docker-logs    # Muestra los logs de la API
+make lint           # Ejecuta el linter (golangci-lint)
+make fmt            # Formatea el código (go fmt)
+make swagger        # Regenera la especificación OpenAPI
+make deps           # Descarga y ordena las dependencias
+make clean          # Limpia artefactos de compilación
+```
 
-# 2. Run tests
-make test-race
+### Flujo de trabajo típico
 
-# 3. Build binary
-make build
-
-# 4. Run API
-./bin/server
-
-# 5. Test endpoint
-curl -X POST http://localhost:8080/health
-
-# 6. View logs
-make docker-logs
-
-# 7. Clean up
-make docker-down
+```bash
+make docker-up      # 1. Levantar servicios
+make test-race      # 2. Ejecutar pruebas con race detector
+make build          # 3. Compilar
+./bin/server        # 4. Ejecutar API
+make docker-logs    # 5. Ver logs
+make docker-down    # 6. Detener servicios
 ```
 
 ---
 
-## Contributing
+## Contribución
 
-### Code Standards
-
-- **Format:** `go fmt` (enforced in CI)
-- **Lint:** `golangci-lint` (all checks pass)
-- **Tests:** 80%+ coverage
-- **Commits:** Conventional format (`feat:`, `fix:`, `refactor:`)
-
-### Pull Request Process
-
-1. Create branch (`feature/shipment-tracking`)
-2. Write tests first
-3. Implement feature
-4. Run `make test-race`
-5. Ensure `make lint` passes
-6. Submit PR with description
-7. Address review feedback
-
-## License
-
-This project is part of the 99minutos technical challenge. 
-See LICENSE file for details.
+1. Crear rama: `git checkout -b feature/nombre-de-la-feature`
+2. Escribir pruebas primero
+3. Implementar el cambio
+4. Verificar: `make test-race && make lint`
+5. Abrir un Pull Request con descripción del cambio y contexto
 
 ---
 
-## Learning Resources
+## Licencia
 
-### Go Concurrency
-- [Effective Go - Concurrency](https://golang.org/doc/effective_go#concurrency)
-- [Go Memory Model](https://golang.org/ref/mem)
-- [Context Package](https://pkg.go.dev/context)
+MIT License
 
-### Distributed Systems
-- [Designing Data-Intensive Applications](https://dataintensive.systems/) - Martin Kleppmann
-- [Release It!](https://pragprog.com/titles/mnee2/release-it-second-edition/) - Michael Nygard
+---
 
-### MongoDB
-- [MongoDB University](https://university.mongodb.com/)
-- [TTL Indexes](https://docs.mongodb.com/manual/core/index-ttl/)
-- [Transactions](https://docs.mongodb.com/manual/core/transactions/)
-
-## Author
-
-Pedro Rojas Reyes - Backend Engineer
-
-**Built with ❤️ for 99minutos**
-
-*"We want to see how you think, not just how you code."*
-
-
+Pedro Rojas Reyes — Backend Engineer
 

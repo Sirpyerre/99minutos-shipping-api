@@ -77,11 +77,14 @@ services:
     ports:
       - "8081:8080"
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+    command:
+      - --store_container_labels=true
     devices:
       - /dev/kmsg
     depends_on:
