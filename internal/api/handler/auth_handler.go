@@ -31,9 +31,16 @@ type loginRequest struct {
 }
 
 type authResponse struct {
-	Token     string `json:"token"`
-	TokenType string `json:"token_type"`
-	ExpiresIn int    `json:"expires_in"` // seconds
+	Token     string       `json:"token"`
+	TokenType string       `json:"token_type"`
+	ExpiresIn int          `json:"expires_in"`
+	User      *userPayload `json:"user,omitempty"`
+}
+
+type userPayload struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	ClientID string `json:"client_id,omitempty"`
 }
 
 // Register creates a new user account.
@@ -66,8 +73,15 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(status, map[string]string{"error": err.Error()})
 	}
 
-	_ = user
-	return c.JSON(http.StatusCreated, map[string]string{"message": "user created"})
+	resp := map[string]any{"message": "user created"}
+	if user != nil {
+		resp["user"] = userPayload{
+			Username: user.Username,
+			Role:     user.Role,
+			ClientID: user.ClientID,
+		}
+	}
+	return c.JSON(http.StatusCreated, resp)
 }
 
 // Login authenticates a user and returns a JWT token.
@@ -88,7 +102,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
 	}
 
-	token, _, err := h.authService.Login(c.Request().Context(), req.Email, req.Password)
+	token, user, err := h.authService.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
 		status := http.StatusUnauthorized
 		switch err {
@@ -100,9 +114,17 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(status, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, authResponse{
+	resp := authResponse{
 		Token:     token,
 		TokenType: "Bearer",
-		ExpiresIn: 86400, // 24 h, matches service default TTL
-	})
+		ExpiresIn: 86400,
+	}
+	if user != nil {
+		resp.User = &userPayload{
+			Username: user.Username,
+			Role:     user.Role,
+			ClientID: user.ClientID,
+		}
+	}
+	return c.JSON(http.StatusOK, resp)
 }

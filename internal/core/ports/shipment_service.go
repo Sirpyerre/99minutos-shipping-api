@@ -71,29 +71,65 @@ type GetShipmentInput struct {
 	ClientID string
 }
 
-// StatusHistoryItem is a single entry in the shipment's status history response.
+// StatusHistoryItem is a single entry in the shipment's status history.
 type StatusHistoryItem struct {
-	Status    string `json:"status"`
-	Timestamp string `json:"timestamp"`
-	Notes     string `json:"notes,omitempty"`
+	Status    string
+	Timestamp time.Time
+	Notes     string
 }
 
 // ShipmentDetail is the full shipment view returned by GetShipment.
 type ShipmentDetail struct {
-	TrackingNumber    string              `json:"tracking_number"`
-	Status            string              `json:"status"`
-	ServiceType       string              `json:"service_type"`
-	CreatedAt         string              `json:"created_at"`
-	EstimatedDelivery string              `json:"estimated_delivery"`
-	Sender            SenderInput         `json:"sender"`
-	Origin            AddressInput        `json:"origin"`
-	Destination       AddressInput        `json:"destination"`
-	Package           PackageInput        `json:"package"`
-	StatusHistory     []StatusHistoryItem `json:"status_history"`
+	TrackingNumber    string
+	Status            string
+	ServiceType       string
+	CreatedAt         time.Time
+	EstimatedDelivery time.Time
+	Sender            SenderInput
+	Origin            AddressInput
+	Destination       AddressInput
+	Package           PackageInput
+	StatusHistory     []StatusHistoryItem
 }
 
 // ShipmentService defines use-case operations for shipments.
 type ShipmentService interface {
 	CreateShipment(ctx context.Context, input CreateShipmentInput) (*ShipmentResult, error)
 	GetShipment(ctx context.Context, input GetShipmentInput) (*ShipmentDetail, error)
+	ListShipments(ctx context.Context, input ListShipmentsInput) (*ListShipmentsResult, error)
+}
+
+// ListShipmentsInput carries all parameters for the list endpoint.
+type ListShipmentsInput struct {
+	Role        string
+	ClientID    string
+	Status      string
+	ServiceType string
+	Search      string
+	DateFrom    time.Time
+	DateTo      time.Time
+	Page        int
+	Limit       int
+}
+
+// ShipmentSummary is the lightweight view used in list responses (no status_history).
+type ShipmentSummary struct {
+	TrackingNumber    string
+	Status            string
+	ServiceType       string
+	ClientID          string
+	Sender            SenderInput
+	Origin            AddressInput
+	Destination       AddressInput
+	CreatedAt         time.Time
+	EstimatedDelivery time.Time
+}
+
+// ListShipmentsResult is returned by ListShipments.
+type ListShipmentsResult struct {
+	Items      []ShipmentSummary
+	Total      int64
+	Page       int
+	Limit      int
+	TotalPages int
 }

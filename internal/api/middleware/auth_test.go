@@ -65,7 +65,9 @@ func TestAuthMiddleware_MissingHeader(t *testing.T) {
 		return nil
 	})
 
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)
@@ -85,7 +87,9 @@ func TestAuthMiddleware_InvalidHeaderFormat(t *testing.T) {
 		return nil
 	})
 
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)
@@ -105,7 +109,9 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 		return nil
 	})
 
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)

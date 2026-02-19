@@ -20,6 +20,7 @@ import (
 func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
+	e.Validator = handler.NewValidator()
 
 	// --- Global middleware ---
 	e.Use(echomiddleware.Recover())
@@ -28,6 +29,8 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 
 	// --- Dependencies ---
 	log := logger.Init(logger.Options{Pretty: true})
+
+	e.HTTPErrorHandler = NewHTTPErrorHandler(log)
 
 	authRepo := mongoinfra.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepo, jwtSecret, 24*time.Hour)
@@ -55,6 +58,7 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 
 	// --- v1 API (JWT protected) ---
 	v1 := e.Group("/v1", authMiddleware)
+	v1.GET("/shipments", shipmentHandler.List)
 	v1.POST("/shipments", shipmentHandler.Create)
 	v1.GET("/shipments/:tracking_number", shipmentHandler.Get)
 

@@ -119,7 +119,7 @@ func (s *ShipmentService) GetShipment(ctx context.Context, input ports.GetShipme
 	for i, h := range shipment.StatusHistory {
 		history[i] = ports.StatusHistoryItem{
 			Status:    string(h.Status),
-			Timestamp: h.Timestamp.UTC().Format("2006-01-02T15:04:05Z"),
+			Timestamp: h.Timestamp,
 			Notes:     h.Notes,
 		}
 	}
@@ -128,8 +128,8 @@ func (s *ShipmentService) GetShipment(ctx context.Context, input ports.GetShipme
 		TrackingNumber:    shipment.TrackingNumber,
 		Status:            string(shipment.Status),
 		ServiceType:       shipment.ServiceType,
-		CreatedAt:         shipment.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
-		EstimatedDelivery: shipment.EstimatedDelivery.UTC().Format("2006-01-02T15:04:05Z"),
+		CreatedAt:         shipment.CreatedAt,
+		EstimatedDelivery: shipment.EstimatedDelivery,
 		Sender: ports.SenderInput{
 			Name:  shipment.Sender.Name,
 			Email: shipment.Sender.Email,
@@ -168,7 +168,98 @@ func (s *ShipmentService) GetShipment(ctx context.Context, input ports.GetShipme
 	}, nil
 }
 
-// generateTrackingNumber returns a unique tracking number in the format 99M-XXXXXXXX.
+const (
+	defaultLimit = 20
+	maxLimit     = 100
+)
+
+// ListShipments returns a paginated, filtered list of shipments.
+// Clients are always scoped to their own shipments; admins see all.
+func (s *ShipmentService) ListShipments(ctx context.Context, input ports.ListShipmentsInput) (*ports.ListShipmentsResult, error) {
+	// Normalise pagination.
+	limit := input.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	page := input.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	// RBAC: clients can only see their own shipments.
+	clientIDFilter := ""
+	if input.Role == domain.RoleClient {
+		clientIDFilter = input.ClientID
+	}
+
+	filter := ports.ListShipmentsFilter{
+		ClientID:    clientIDFilter,
+		Status:      input.Status,
+		ServiceType: input.ServiceType,
+		Search:      input.Search,
+		DateFrom:    input.DateFrom,
+		DateTo:      input.DateTo,
+		Page:        page,
+		Limit:       limit,
+	}
+
+	shipments, total, err := s.repo.List(ctx, filter)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to list shipments")
+		return nil, err
+	}
+
+	items := make([]ports.ShipmentSummary, len(shipments))
+	for i, sh := range shipments {
+		items[i] = ports.ShipmentSummary{
+			TrackingNumber:    sh.TrackingNumber,
+			Status:            string(sh.Status),
+			ServiceType:       sh.ServiceType,
+			ClientID:          sh.ClientID,
+			CreatedAt:         sh.CreatedAt,
+			EstimatedDelivery: sh.EstimatedDelivery,
+			Sender: ports.SenderInput{
+				Name:  sh.Sender.Name,
+				Email: sh.Sender.Email,
+				Phone: sh.Sender.Phone,
+			},
+			Origin: ports.AddressInput{
+				Address: sh.Origin.Address,
+				City:    sh.Origin.City,
+				ZipCode: sh.Origin.ZipCode,
+				Coordinates: ports.CoordinatesInput{
+					Lat: sh.Origin.Coordinates.Lat,
+					Lng: sh.Origin.Coordinates.Lng,
+				},
+			},
+			Destination: ports.AddressInput{
+				Address: sh.Destination.Address,
+				City:    sh.Destination.City,
+				ZipCode: sh.Destination.ZipCode,
+				Coordinates: ports.CoordinatesInput{
+					Lat: sh.Destination.Coordinates.Lat,
+					Lng: sh.Destination.Coordinates.Lng,
+				},
+			},
+		}
+	}
+
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	return &ports.ListShipmentsResult{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
 func generateTrackingNumber() string {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {

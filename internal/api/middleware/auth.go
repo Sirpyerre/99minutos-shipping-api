@@ -14,25 +14,23 @@ func Auth(jwtSecret string) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing authorization header"})
+				return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
 			}
 
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid authorization header"})
+				return echo.NewHTTPError(http.StatusUnauthorized, "invalid authorization header")
 			}
 
-			tokenStr := parts[1]
-
 			claims := jwt.MapClaims{}
-			tkn, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			tkn, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
 				if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 					return nil, jwt.ErrTokenSignatureInvalid
 				}
 				return []byte(jwtSecret), nil
 			})
 			if err != nil || !tkn.Valid {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token"})
+				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
 			}
 
 			c.Set("username", claims["username"])
