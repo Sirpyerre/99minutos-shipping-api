@@ -188,31 +188,93 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/v1/shipments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shipments"
+                ],
+                "summary": "Create a new shipment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Idempotency key to prevent duplicate submissions",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Shipment details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handler.createShipmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handler.createShipmentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "github_com_99minutos_shipping-system_internal_core_domain.User": {
+        "internal_api_handler.addressRequest": {
             "type": "object",
             "properties": {
-                "client_id": {
+                "address": {
                     "type": "string"
                 },
-                "created_at": {
+                "city": {
                     "type": "string"
                 },
-                "email": {
-                    "type": "string"
+                "coordinates": {
+                    "$ref": "#/definitions/internal_api_handler.coordinatesRequest"
                 },
-                "id": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "username": {
+                "zip_code": {
                     "type": "string"
                 }
             }
@@ -220,11 +282,66 @@ const docTemplate = `{
         "internal_api_handler.authResponse": {
             "type": "object",
             "properties": {
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer"
+                },
                 "token": {
                     "type": "string"
                 },
-                "user": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_domain.User"
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handler.coordinatesRequest": {
+            "type": "object",
+            "properties": {
+                "lat": {
+                    "type": "number"
+                },
+                "lng": {
+                    "type": "number"
+                }
+            }
+        },
+        "internal_api_handler.createShipmentRequest": {
+            "type": "object",
+            "properties": {
+                "destination": {
+                    "$ref": "#/definitions/internal_api_handler.addressRequest"
+                },
+                "origin": {
+                    "$ref": "#/definitions/internal_api_handler.addressRequest"
+                },
+                "package": {
+                    "$ref": "#/definitions/internal_api_handler.packageRequest"
+                },
+                "sender": {
+                    "$ref": "#/definitions/internal_api_handler.senderRequest"
+                },
+                "service_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handler.createShipmentResponse": {
+            "type": "object",
+            "properties": {
+                "_links": {
+                    "$ref": "#/definitions/internal_api_handler.shipmentLinks"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "estimated_delivery": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tracking_number": {
+                    "type": "string"
                 }
             }
         },
@@ -239,6 +356,20 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_api_handler.dimensionsRequest": {
+            "type": "object",
+            "properties": {
+                "height_cm": {
+                    "type": "number"
+                },
+                "length_cm": {
+                    "type": "number"
+                },
+                "width_cm": {
+                    "type": "number"
+                }
+            }
+        },
         "internal_api_handler.loginRequest": {
             "type": "object",
             "properties": {
@@ -247,6 +378,26 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_api_handler.packageRequest": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "declared_value": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "$ref": "#/definitions/internal_api_handler.dimensionsRequest"
+                },
+                "weight_kg": {
+                    "type": "number"
                 }
             }
         },
@@ -280,6 +431,31 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handler.senderRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handler.shipmentLinks": {
+            "type": "object",
+            "properties": {
+                "events": {
+                    "type": "string"
+                },
+                "self": {
                     "type": "string"
                 }
             }

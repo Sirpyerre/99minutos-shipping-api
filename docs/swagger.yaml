@@ -1,28 +1,58 @@
 basePath: /
 definitions:
-  github_com_99minutos_shipping-system_internal_core_domain.User:
+  internal_api_handler.addressRequest:
     properties:
-      client_id:
+      address:
         type: string
-      created_at:
+      city:
         type: string
-      email:
-        type: string
-      id:
-        type: string
-      role:
-        type: string
-      updated_at:
-        type: string
-      username:
+      coordinates:
+        $ref: '#/definitions/internal_api_handler.coordinatesRequest'
+      zip_code:
         type: string
     type: object
   internal_api_handler.authResponse:
     properties:
+      expires_in:
+        description: seconds
+        type: integer
       token:
         type: string
-      user:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_domain.User'
+      token_type:
+        type: string
+    type: object
+  internal_api_handler.coordinatesRequest:
+    properties:
+      lat:
+        type: number
+      lng:
+        type: number
+    type: object
+  internal_api_handler.createShipmentRequest:
+    properties:
+      destination:
+        $ref: '#/definitions/internal_api_handler.addressRequest'
+      origin:
+        $ref: '#/definitions/internal_api_handler.addressRequest'
+      package:
+        $ref: '#/definitions/internal_api_handler.packageRequest'
+      sender:
+        $ref: '#/definitions/internal_api_handler.senderRequest'
+      service_type:
+        type: string
+    type: object
+  internal_api_handler.createShipmentResponse:
+    properties:
+      _links:
+        $ref: '#/definitions/internal_api_handler.shipmentLinks'
+      created_at:
+        type: string
+      estimated_delivery:
+        type: string
+      status:
+        type: string
+      tracking_number:
+        type: string
     type: object
   internal_api_handler.dependencyStatus:
     properties:
@@ -31,12 +61,34 @@ definitions:
       status:
         type: string
     type: object
+  internal_api_handler.dimensionsRequest:
+    properties:
+      height_cm:
+        type: number
+      length_cm:
+        type: number
+      width_cm:
+        type: number
+    type: object
   internal_api_handler.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
+    type: object
+  internal_api_handler.packageRequest:
+    properties:
+      currency:
+        type: string
+      declared_value:
+        type: number
+      description:
+        type: string
+      dimensions:
+        $ref: '#/definitions/internal_api_handler.dimensionsRequest'
+      weight_kg:
+        type: number
     type: object
   internal_api_handler.readinessResponse:
     properties:
@@ -58,6 +110,22 @@ definitions:
       role:
         type: string
       username:
+        type: string
+    type: object
+  internal_api_handler.senderRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    type: object
+  internal_api_handler.shipmentLinks:
+    properties:
+      events:
+        type: string
+      self:
         type: string
     type: object
 host: localhost:3000
@@ -181,6 +249,51 @@ paths:
       summary: Readiness probe
       tags:
       - health
+  /v1/shipments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Idempotency key to prevent duplicate submissions
+        in: header
+        name: Idempotency-Key
+        type: string
+      - description: Shipment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handler.createShipmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_api_handler.createShipmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new shipment
+      tags:
+      - shipments
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

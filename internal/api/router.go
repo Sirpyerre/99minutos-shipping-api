@@ -12,7 +12,8 @@ import (
 	"github.com/99minutos/shipping-system/internal/api/handler"
 	"github.com/99minutos/shipping-system/internal/api/middleware"
 	"github.com/99minutos/shipping-system/internal/core/service"
-	mongoauth "github.com/99minutos/shipping-system/internal/infrastructure/db/mongo"
+	mongoinfra "github.com/99minutos/shipping-system/internal/infrastructure/db/mongo"
+	"github.com/99minutos/shipping-system/internal/pkg/logger"
 )
 
 // NewRouter builds and returns the Echo instance with all routes registered.
@@ -26,13 +27,19 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 	e.Use(echomiddleware.Logger())
 
 	// --- Dependencies ---
-	authRepo := mongoauth.NewAuthRepository(db)
+	log := logger.Init(logger.Options{Pretty: true})
+
+	authRepo := mongoinfra.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepo, jwtSecret, 24*time.Hour)
 	authHandler := handler.NewAuthHandler(authService)
-	authMiddleware := middleware.Auth(jwtSecret)
-	_ = authMiddleware
 
-	// --- Auth routes ---
+	shipmentRepo := mongoinfra.NewShipmentRepository(db)
+	shipmentService := service.NewShipmentService(shipmentRepo, log)
+	shipmentHandler := handler.NewShipmentHandler(shipmentService)
+
+	authMiddleware := middleware.Auth(jwtSecret)
+
+	// --- Auth routes (public) ---
 	e.POST("/auth/register", authHandler.Register)
 	e.POST("/auth/login", authHandler.Login)
 
@@ -40,11 +47,15 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 	healthHandler := handler.NewHealthHandler()
 	healthDepsHandler := handler.NewHealthDependenciesHandler(db, rdb)
 
-	e.GET("/health", healthHandler.Liveness)            // liveness  – is the process alive?
-	e.GET("/health/ready", healthDepsHandler.Readiness) // readiness – are dependencies up?
+	e.GET("/health", healthHandler.Liveness)
+	e.GET("/health/ready", healthDepsHandler.Readiness)
 
 	// --- Swagger UI ---
 	e.GET("/swagger/*", echoswagger.WrapHandler)
+
+	// --- v1 API (JWT protected) ---
+	v1 := e.Group("/v1", authMiddleware)
+	v1.POST("/shipments", shipmentHandler.Create)
 
 	return e
 }
