@@ -28,7 +28,7 @@ export function setupUser(suffix) {
   const clientId = `client_${suffix}`;
 
   const regRes = register(username, password, email, role, clientId);
-  if (regRes.status !== 201) {
+  if (regRes.status !== 201 && regRes.status !== 409) {
     fail(`setup: register failed (${regRes.status}): ${regRes.body}`);
   }
 
@@ -50,7 +50,7 @@ export function setupAdmin(suffix) {
   const password = 'Password123!';
 
   const regRes = register(username, password, email, 'admin', '');
-  if (regRes.status !== 201) {
+  if (regRes.status !== 201 && regRes.status !== 409) {
     fail(`setup: admin register failed (${regRes.status}): ${regRes.body}`);
   }
 

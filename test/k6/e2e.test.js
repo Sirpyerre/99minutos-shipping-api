@@ -125,7 +125,9 @@ export default function (data) {
   // ── Step 5: List endpoint reflects final state ───────────────────────────
 
   group('Step 5: List shows shipment with status delivered', () => {
-    const res = listShipments(client.token, { status: 'delivered' });
+    // Use search to pin to this specific tracking_number (avoids pagination issues
+    // when running with multiple VUs/iterations creating many concurrent shipments)
+    const res = listShipments(client.token, { status: 'delivered', search: trackingNumber });
     const body = parse(res);
     check(res, {
       'status 200':                   r => r.status === 200,

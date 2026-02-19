@@ -68,6 +68,25 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── cAdvisor ────────────────────────────────────────────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: shipping_cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    depends_on:
+      - api
+
   # ─── Prometheus ──────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.2
@@ -102,6 +121,7 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
+      - cadvisor
 
 volumes:
   mongo_data:
