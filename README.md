@@ -347,6 +347,8 @@ curl http://localhost:8080/health
 
 ### Swagger UI
 
+  <img src="./docs/swagger-documentation-shipping-tracking.png" alt="Dashboard de Grafana" width="800"/>
+
 La API incluye una especificación OpenAPI 2.0 generada con [swaggo](https://github.com/swaggo/swag).
 
 | URL | Descripción |
@@ -716,6 +718,9 @@ El dashboard `deployments/grafana/dashboards/shipping_api.json` se provisiona au
 - Latencia p50 / p95 / p99 por endpoint
 - Tasa de error (4xx + 5xx)
 
+  <img src="./docs/dashboard-grafana-events-shippings.png" alt="Dashboard de Grafana" width="800"/>
+
+
 **Pipeline de procesamiento de eventos**
 - Eventos procesados/s por estado y fuente
 - Duración de procesamiento p50 / p95
@@ -730,6 +735,8 @@ El dashboard `deployments/grafana/dashboards/shipping_api.json` se provisiona au
 **Recursos del proceso**
 - CPU (%), RSS memory (MB)
 - Go heap: allocado vs reservado
+
+  <img src="./docs/dashboard-grafana-events-resources.png" alt="Dashboard de Grafana" width="800"/>
 
 ### Métricas Prometheus personalizadas
 
