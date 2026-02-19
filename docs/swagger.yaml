@@ -1,5 +1,70 @@
 basePath: /
 definitions:
+  github_com_99minutos_shipping-system_internal_core_ports.AddressInput:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      coordinates:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput'
+      zipCode:
+        type: string
+    type: object
+  github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput:
+    properties:
+      lat:
+        format: float64
+        type: number
+      lng:
+        format: float64
+        type: number
+    type: object
+  github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput:
+    properties:
+      heightCm:
+        format: float64
+        type: number
+      lengthCm:
+        format: float64
+        type: number
+      widthCm:
+        format: float64
+        type: number
+    type: object
+  github_com_99minutos_shipping-system_internal_core_ports.PackageInput:
+    properties:
+      currency:
+        type: string
+      declaredValue:
+        format: float64
+        type: number
+      description:
+        type: string
+      dimensions:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput'
+      weightKg:
+        format: float64
+        type: number
+    type: object
+  github_com_99minutos_shipping-system_internal_core_ports.SenderInput:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    type: object
+  github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem:
+    properties:
+      notes:
+        type: string
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
   internal_api_handler.addressRequest:
     properties:
       address:
@@ -69,6 +134,33 @@ definitions:
         type: number
       width_cm:
         type: number
+    type: object
+  internal_api_handler.getShipmentResponse:
+    properties:
+      _links:
+        $ref: '#/definitions/internal_api_handler.shipmentLinks'
+      created_at:
+        type: string
+      destination:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput'
+      estimated_delivery:
+        type: string
+      origin:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput'
+      package:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.PackageInput'
+      sender:
+        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.SenderInput'
+      service_type:
+        type: string
+      status:
+        type: string
+      status_history:
+        items:
+          $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem'
+        type: array
+      tracking_number:
+        type: string
     type: object
   internal_api_handler.loginRequest:
     properties:
@@ -292,6 +384,44 @@ paths:
       security:
       - BearerAuth: []
       summary: Create a new shipment
+      tags:
+      - shipments
+  /v1/shipments/{tracking_number}:
+    get:
+      parameters:
+      - description: Tracking number (e.g. 99M-7A8B9C2D)
+        in: path
+        name: tracking_number
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handler.getShipmentResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a shipment by tracking number
       tags:
       - shipments
 securityDefinitions:

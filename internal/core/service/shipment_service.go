@@ -47,6 +47,9 @@ func (s *ShipmentService) CreateShipment(ctx context.Context, input ports.Create
 		CreatedAt:         now,
 		EstimatedDelivery: estimatedDelivery(input.ServiceType, now),
 		IdempotencyKey:    input.IdempotencyKey,
+		StatusHistory: []domain.StatusHistoryEntry{
+			{Status: domain.StatusCreated, Timestamp: now},
+		},
 		Sender: domain.Person{
 			Name:  input.Sender.Name,
 			Email: input.Sender.Email,
@@ -95,6 +98,73 @@ func (s *ShipmentService) CreateShipment(ctx context.Context, input ports.Create
 		Status:            string(shipment.Status),
 		CreatedAt:         shipment.CreatedAt,
 		EstimatedDelivery: shipment.EstimatedDelivery,
+	}, nil
+}
+
+// GetShipment retrieves a shipment with its full status history.
+// Clients can only see their own shipments; admins see all.
+func (s *ShipmentService) GetShipment(ctx context.Context, input ports.GetShipmentInput) (*ports.ShipmentDetail, error) {
+	// For "client" role, pass clientID so the repo enforces ownership at query level.
+	filterClientID := ""
+	if input.Role == domain.RoleClient {
+		filterClientID = input.ClientID
+	}
+
+	shipment, err := s.repo.FindByTrackingNumber(ctx, input.TrackingNumber, filterClientID)
+	if err != nil {
+		return nil, err // ErrShipmentNotFound is returned as-is
+	}
+
+	history := make([]ports.StatusHistoryItem, len(shipment.StatusHistory))
+	for i, h := range shipment.StatusHistory {
+		history[i] = ports.StatusHistoryItem{
+			Status:    string(h.Status),
+			Timestamp: h.Timestamp.UTC().Format("2006-01-02T15:04:05Z"),
+			Notes:     h.Notes,
+		}
+	}
+
+	return &ports.ShipmentDetail{
+		TrackingNumber:    shipment.TrackingNumber,
+		Status:            string(shipment.Status),
+		ServiceType:       shipment.ServiceType,
+		CreatedAt:         shipment.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		EstimatedDelivery: shipment.EstimatedDelivery.UTC().Format("2006-01-02T15:04:05Z"),
+		Sender: ports.SenderInput{
+			Name:  shipment.Sender.Name,
+			Email: shipment.Sender.Email,
+			Phone: shipment.Sender.Phone,
+		},
+		Origin: ports.AddressInput{
+			Address: shipment.Origin.Address,
+			City:    shipment.Origin.City,
+			ZipCode: shipment.Origin.ZipCode,
+			Coordinates: ports.CoordinatesInput{
+				Lat: shipment.Origin.Coordinates.Lat,
+				Lng: shipment.Origin.Coordinates.Lng,
+			},
+		},
+		Destination: ports.AddressInput{
+			Address: shipment.Destination.Address,
+			City:    shipment.Destination.City,
+			ZipCode: shipment.Destination.ZipCode,
+			Coordinates: ports.CoordinatesInput{
+				Lat: shipment.Destination.Coordinates.Lat,
+				Lng: shipment.Destination.Coordinates.Lng,
+			},
+		},
+		Package: ports.PackageInput{
+			WeightKg: shipment.Package.WeightKg,
+			Dimensions: ports.DimensionsInput{
+				LengthCm: shipment.Package.Dimensions.LengthCm,
+				WidthCm:  shipment.Package.Dimensions.WidthCm,
+				HeightCm: shipment.Package.Dimensions.HeightCm,
+			},
+			Description:   shipment.Package.Description,
+			DeclaredValue: shipment.Package.DeclaredValue,
+			Currency:      shipment.Package.Currency,
+		},
+		StatusHistory: history,
 	}, nil
 }
 

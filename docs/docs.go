@@ -259,9 +259,166 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/v1/shipments/{tracking_number}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shipments"
+                ],
+                "summary": "Get a shipment by tracking number",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tracking number (e.g. 99M-7A8B9C2D)",
+                        "name": "tracking_number",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handler.getShipmentResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "github_com_99minutos_shipping-system_internal_core_ports.AddressInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "coordinates": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput"
+                },
+                "zipCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput": {
+            "type": "object",
+            "properties": {
+                "lat": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "lng": {
+                    "type": "number",
+                    "format": "float64"
+                }
+            }
+        },
+        "github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput": {
+            "type": "object",
+            "properties": {
+                "heightCm": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "lengthCm": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "widthCm": {
+                    "type": "number",
+                    "format": "float64"
+                }
+            }
+        },
+        "github_com_99minutos_shipping-system_internal_core_ports.PackageInput": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "declaredValue": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput"
+                },
+                "weightKg": {
+                    "type": "number",
+                    "format": "float64"
+                }
+            }
+        },
+        "github_com_99minutos_shipping-system_internal_core_ports.SenderInput": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_api_handler.addressRequest": {
             "type": "object",
             "properties": {
@@ -367,6 +524,47 @@ const docTemplate = `{
                 },
                 "width_cm": {
                     "type": "number"
+                }
+            }
+        },
+        "internal_api_handler.getShipmentResponse": {
+            "type": "object",
+            "properties": {
+                "_links": {
+                    "$ref": "#/definitions/internal_api_handler.shipmentLinks"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "destination": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput"
+                },
+                "estimated_delivery": {
+                    "type": "string"
+                },
+                "origin": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput"
+                },
+                "package": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.PackageInput"
+                },
+                "sender": {
+                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.SenderInput"
+                },
+                "service_type": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_history": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem"
+                    }
+                },
+                "tracking_number": {
+                    "type": "string"
                 }
             }
         },

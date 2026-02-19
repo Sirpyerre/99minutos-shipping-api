@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/99minutos/shipping-system/internal/core/domain"
 	"github.com/99minutos/shipping-system/internal/core/ports"
 )
 
@@ -72,7 +74,69 @@ type createShipmentResponse struct {
 	Links             shipmentLinks `json:"_links"`
 }
 
-// Create handles POST /v1/shipments.
+type getShipmentResponse struct {
+	TrackingNumber    string                    `json:"tracking_number"`
+	Status            string                    `json:"status"`
+	ServiceType       string                    `json:"service_type"`
+	CreatedAt         string                    `json:"created_at"`
+	EstimatedDelivery string                    `json:"estimated_delivery"`
+	Sender            ports.SenderInput         `json:"sender"`
+	Origin            ports.AddressInput        `json:"origin"`
+	Destination       ports.AddressInput        `json:"destination"`
+	Package           ports.PackageInput        `json:"package"`
+	StatusHistory     []ports.StatusHistoryItem `json:"status_history"`
+	Links             shipmentLinks             `json:"_links"`
+}
+
+// Get handles GET /v1/shipments/:tracking_number.
+//
+// @Summary      Get a shipment by tracking number
+// @Tags         shipments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        tracking_number  path      string  true  "Tracking number (e.g. 99M-7A8B9C2D)"
+// @Success      200              {object}  getShipmentResponse
+// @Failure      403              {object}  map[string]string
+// @Failure      404              {object}  map[string]string
+// @Failure      500              {object}  map[string]string
+// @Router       /v1/shipments/{tracking_number} [get]
+func (h *ShipmentHandler) Get(c echo.Context) error {
+	trackingNumber := c.Param("tracking_number")
+	role, _ := c.Get("role").(string)
+	clientID, _ := c.Get("client_id").(string)
+
+	detail, err := h.service.GetShipment(c.Request().Context(), ports.GetShipmentInput{
+		TrackingNumber: trackingNumber,
+		Role:           role,
+		ClientID:       clientID,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrShipmentNotFound) {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "shipment not found"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "access forbidden"})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
+	}
+
+	return c.JSON(http.StatusOK, getShipmentResponse{
+		TrackingNumber:    detail.TrackingNumber,
+		Status:            detail.Status,
+		ServiceType:       detail.ServiceType,
+		CreatedAt:         detail.CreatedAt,
+		EstimatedDelivery: detail.EstimatedDelivery,
+		Sender:            detail.Sender,
+		Origin:            detail.Origin,
+		Destination:       detail.Destination,
+		Package:           detail.Package,
+		StatusHistory:     detail.StatusHistory,
+		Links: shipmentLinks{
+			Self:   "/shipments/" + detail.TrackingNumber,
+			Events: "/events/" + detail.TrackingNumber,
+		},
+	})
+}
 //
 // @Summary      Create a new shipment
 // @Tags         shipments

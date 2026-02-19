@@ -56,6 +56,7 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 	// --- v1 API (JWT protected) ---
 	v1 := e.Group("/v1", authMiddleware)
 	v1.POST("/shipments", shipmentHandler.Create)
+	v1.GET("/shipments/:tracking_number", shipmentHandler.Get)
 
 	return e
 }
