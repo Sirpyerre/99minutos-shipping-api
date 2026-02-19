@@ -1,115 +1,87 @@
 basePath: /
 definitions:
-  github_com_99minutos_shipping-system_internal_core_ports.AddressInput:
+  handler.addressRequest:
     properties:
       address:
         type: string
       city:
         type: string
       coordinates:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput'
-      zipCode:
+        $ref: '#/definitions/handler.coordinatesRequest'
+      zip_code:
         type: string
+    required:
+    - address
+    - city
+    - coordinates
+    - zip_code
     type: object
-  github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput:
-    properties:
-      lat:
-        format: float64
-        type: number
-      lng:
-        format: float64
-        type: number
-    type: object
-  github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput:
-    properties:
-      heightCm:
-        format: float64
-        type: number
-      lengthCm:
-        format: float64
-        type: number
-      widthCm:
-        format: float64
-        type: number
-    type: object
-  github_com_99minutos_shipping-system_internal_core_ports.PackageInput:
-    properties:
-      currency:
-        type: string
-      declaredValue:
-        format: float64
-        type: number
-      description:
-        type: string
-      dimensions:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput'
-      weightKg:
-        format: float64
-        type: number
-    type: object
-  github_com_99minutos_shipping-system_internal_core_ports.SenderInput:
-    properties:
-      email:
-        type: string
-      name:
-        type: string
-      phone:
-        type: string
-    type: object
-  github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem:
-    properties:
-      notes:
-        type: string
-      status:
-        type: string
-      timestamp:
-        type: string
-    type: object
-  internal_api_handler.addressRequest:
+  handler.addressResponse:
     properties:
       address:
         type: string
       city:
         type: string
       coordinates:
-        $ref: '#/definitions/internal_api_handler.coordinatesRequest'
+        $ref: '#/definitions/handler.coordinatesResponse'
       zip_code:
         type: string
     type: object
-  internal_api_handler.authResponse:
+  handler.authResponse:
     properties:
       expires_in:
-        description: seconds
         type: integer
       token:
         type: string
       token_type:
         type: string
+      user:
+        $ref: '#/definitions/handler.userPayload'
     type: object
-  internal_api_handler.coordinatesRequest:
+  handler.coordinatesRequest:
+    properties:
+      lat:
+        type: number
+      lng:
+        type: number
+    required:
+    - lat
+    - lng
+    type: object
+  handler.coordinatesResponse:
     properties:
       lat:
         type: number
       lng:
         type: number
     type: object
-  internal_api_handler.createShipmentRequest:
+  handler.createShipmentRequest:
     properties:
       destination:
-        $ref: '#/definitions/internal_api_handler.addressRequest'
+        $ref: '#/definitions/handler.addressRequest'
       origin:
-        $ref: '#/definitions/internal_api_handler.addressRequest'
+        $ref: '#/definitions/handler.addressRequest'
       package:
-        $ref: '#/definitions/internal_api_handler.packageRequest'
+        $ref: '#/definitions/handler.packageRequest'
       sender:
-        $ref: '#/definitions/internal_api_handler.senderRequest'
+        $ref: '#/definitions/handler.senderRequest'
       service_type:
+        enum:
+        - same_day
+        - next_day
+        - standard
         type: string
+    required:
+    - destination
+    - origin
+    - package
+    - sender
+    - service_type
     type: object
-  internal_api_handler.createShipmentResponse:
+  handler.createShipmentResponse:
     properties:
       _links:
-        $ref: '#/definitions/internal_api_handler.shipmentLinks'
+        $ref: '#/definitions/handler.shipmentLinks'
       created_at:
         type: string
       estimated_delivery:
@@ -119,14 +91,27 @@ definitions:
       tracking_number:
         type: string
     type: object
-  internal_api_handler.dependencyStatus:
+  handler.dependencyStatus:
     properties:
       error:
         type: string
       status:
         type: string
     type: object
-  internal_api_handler.dimensionsRequest:
+  handler.dimensionsRequest:
+    properties:
+      height_cm:
+        type: number
+      length_cm:
+        type: number
+      width_cm:
+        type: number
+    required:
+    - height_cm
+    - length_cm
+    - width_cm
+    type: object
+  handler.dimensionsResponse:
     properties:
       height_cm:
         type: number
@@ -135,41 +120,55 @@ definitions:
       width_cm:
         type: number
     type: object
-  internal_api_handler.getShipmentResponse:
+  handler.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handler.getShipmentResponse:
     properties:
       _links:
-        $ref: '#/definitions/internal_api_handler.shipmentLinks'
+        $ref: '#/definitions/handler.shipmentLinks'
       created_at:
         type: string
       destination:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput'
+        $ref: '#/definitions/handler.addressResponse'
       estimated_delivery:
         type: string
       origin:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput'
+        $ref: '#/definitions/handler.addressResponse'
       package:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.PackageInput'
+        $ref: '#/definitions/handler.packageResponse'
       sender:
-        $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.SenderInput'
+        $ref: '#/definitions/handler.senderResponse'
       service_type:
         type: string
       status:
         type: string
       status_history:
         items:
-          $ref: '#/definitions/github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem'
+          $ref: '#/definitions/handler.statusHistoryItemResponse'
         type: array
       tracking_number:
         type: string
     type: object
-  internal_api_handler.loginRequest:
+  handler.listShipmentsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.shipmentSummaryResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/handler.paginationResponse'
+    type: object
+  handler.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  internal_api_handler.packageRequest:
+  handler.packageRequest:
     properties:
       currency:
         type: string
@@ -178,20 +177,50 @@ definitions:
       description:
         type: string
       dimensions:
-        $ref: '#/definitions/internal_api_handler.dimensionsRequest'
+        $ref: '#/definitions/handler.dimensionsRequest'
+      weight_kg:
+        type: number
+    required:
+    - currency
+    - declared_value
+    - description
+    - dimensions
+    - weight_kg
+    type: object
+  handler.packageResponse:
+    properties:
+      currency:
+        type: string
+      declared_value:
+        type: number
+      description:
+        type: string
+      dimensions:
+        $ref: '#/definitions/handler.dimensionsResponse'
       weight_kg:
         type: number
     type: object
-  internal_api_handler.readinessResponse:
+  handler.paginationResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  handler.readinessResponse:
     properties:
       dependencies:
         additionalProperties:
-          $ref: '#/definitions/internal_api_handler.dependencyStatus'
+          $ref: '#/definitions/handler.dependencyStatus'
         type: object
       status:
         type: string
     type: object
-  internal_api_handler.registerRequest:
+  handler.registerRequest:
     properties:
       client_id:
         type: string
@@ -204,7 +233,20 @@ definitions:
       username:
         type: string
     type: object
-  internal_api_handler.senderRequest:
+  handler.senderRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    required:
+    - email
+    - name
+    - phone
+    type: object
+  handler.senderResponse:
     properties:
       email:
         type: string
@@ -213,11 +255,50 @@ definitions:
       phone:
         type: string
     type: object
-  internal_api_handler.shipmentLinks:
+  handler.shipmentLinks:
     properties:
       events:
         type: string
       self:
+        type: string
+    type: object
+  handler.shipmentSummaryResponse:
+    properties:
+      _links:
+        $ref: '#/definitions/handler.shipmentLinks'
+      created_at:
+        type: string
+      destination:
+        $ref: '#/definitions/handler.addressResponse'
+      estimated_delivery:
+        type: string
+      origin:
+        $ref: '#/definitions/handler.addressResponse'
+      sender:
+        $ref: '#/definitions/handler.senderResponse'
+      service_type:
+        type: string
+      status:
+        type: string
+      tracking_number:
+        type: string
+    type: object
+  handler.statusHistoryItemResponse:
+    properties:
+      notes:
+        type: string
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  handler.userPayload:
+    properties:
+      client_id:
+        type: string
+      role:
+        type: string
+      username:
         type: string
     type: object
 host: localhost:3000
@@ -243,14 +324,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler.loginRequest'
+          $ref: '#/definitions/handler.loginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handler.authResponse'
+            $ref: '#/definitions/handler.authResponse'
         "400":
           description: Bad Request
           schema:
@@ -282,14 +363,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler.registerRequest'
+          $ref: '#/definitions/handler.registerRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handler.authResponse'
+            $ref: '#/definitions/handler.authResponse'
         "400":
           description: Bad Request
           schema:
@@ -333,15 +414,70 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handler.readinessResponse'
+            $ref: '#/definitions/handler.readinessResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/internal_api_handler.readinessResponse'
+            $ref: '#/definitions/handler.readinessResponse'
       summary: Readiness probe
       tags:
       - health
   /v1/shipments:
+    get:
+      parameters:
+      - description: Filter by status (created, picked_up, in_warehouse, in_transit,
+          delivered, cancelled)
+        in: query
+        name: status
+        type: string
+      - description: Filter by service type (same_day, next_day, standard)
+        in: query
+        name: service_type
+        type: string
+      - description: Partial match on tracking_number or sender name
+        in: query
+        name: search
+        type: string
+      - description: Created at >= date (YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Created at <= date (YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.listShipmentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List shipments
+      tags:
+      - shipments
     post:
       consumes:
       - application/json
@@ -355,32 +491,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler.createShipmentRequest'
+          $ref: '#/definitions/handler.createShipmentRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_api_handler.createShipmentResponse'
+            $ref: '#/definitions/handler.createShipmentResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
         "401":
           description: Unauthorized
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
       security:
       - BearerAuth: []
       summary: Create a new shipment
@@ -400,25 +534,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handler.getShipmentResponse'
+            $ref: '#/definitions/handler.getShipmentResponse'
         "403":
           description: Forbidden
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
         "404":
           description: Not Found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handler.errorResponse'
       security:
       - BearerAuth: []
       summary: Get a shipment by tracking number

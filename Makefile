@@ -14,7 +14,7 @@ build: ## Build binary → ./bin/server
 	go build $(BUILD_FLAGS) -o $(BINARY) ./cmd/server
 
 swagger: ## Generate Swagger docs (requires swag CLI: go install github.com/swaggo/swag/cmd/swag@latest)
-	swag init -g cmd/server/main.go -o docs --parseDependency
+	swag init -g cmd/server/main.go --parseInternal -o docs
 
 run: ## Run locally (requires MongoDB + Redis). Loads configs/.env.local
 	set -a && source configs/.env.local && set +a && go run ./cmd/server

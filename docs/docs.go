@@ -41,7 +41,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.loginRequest"
+                            "$ref": "#/definitions/handler.loginRequest"
                         }
                     }
                 ],
@@ -49,7 +49,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.authResponse"
+                            "$ref": "#/definitions/handler.authResponse"
                         }
                     },
                     "400": {
@@ -101,7 +101,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.registerRequest"
+                            "$ref": "#/definitions/handler.registerRequest"
                         }
                     }
                 ],
@@ -109,7 +109,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.authResponse"
+                            "$ref": "#/definitions/handler.authResponse"
                         }
                     },
                     "400": {
@@ -177,19 +177,103 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.readinessResponse"
+                            "$ref": "#/definitions/handler.readinessResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.readinessResponse"
+                            "$ref": "#/definitions/handler.readinessResponse"
                         }
                     }
                 }
             }
         },
         "/v1/shipments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shipments"
+                ],
+                "summary": "List shipments",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (created, picked_up, in_warehouse, in_transit, delivered, cancelled)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by service type (same_day, next_day, standard)",
+                        "name": "service_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Partial match on tracking_number or sender name",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created at \u003e= date (YYYY-MM-DD)",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created at \u003c= date (YYYY-MM-DD)",
+                        "name": "date_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.listShipmentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -219,7 +303,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.createShipmentRequest"
+                            "$ref": "#/definitions/handler.createShipmentRequest"
                         }
                     }
                 ],
@@ -227,34 +311,31 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.createShipmentResponse"
+                            "$ref": "#/definitions/handler.createShipmentResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     }
                 }
@@ -287,34 +368,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handler.getShipmentResponse"
+                            "$ref": "#/definitions/handler.getShipmentResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handler.errorResponse"
                         }
                     }
                 }
@@ -322,8 +394,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_99minutos_shipping-system_internal_core_ports.AddressInput": {
+        "handler.addressRequest": {
             "type": "object",
+            "required": [
+                "address",
+                "city",
+                "coordinates",
+                "zip_code"
+            ],
             "properties": {
                 "address": {
                     "type": "string"
@@ -332,115 +410,34 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "coordinates": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput"
-                },
-                "zipCode": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_99minutos_shipping-system_internal_core_ports.CoordinatesInput": {
-            "type": "object",
-            "properties": {
-                "lat": {
-                    "type": "number",
-                    "format": "float64"
-                },
-                "lng": {
-                    "type": "number",
-                    "format": "float64"
-                }
-            }
-        },
-        "github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput": {
-            "type": "object",
-            "properties": {
-                "heightCm": {
-                    "type": "number",
-                    "format": "float64"
-                },
-                "lengthCm": {
-                    "type": "number",
-                    "format": "float64"
-                },
-                "widthCm": {
-                    "type": "number",
-                    "format": "float64"
-                }
-            }
-        },
-        "github_com_99minutos_shipping-system_internal_core_ports.PackageInput": {
-            "type": "object",
-            "properties": {
-                "currency": {
-                    "type": "string"
-                },
-                "declaredValue": {
-                    "type": "number",
-                    "format": "float64"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "dimensions": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.DimensionsInput"
-                },
-                "weightKg": {
-                    "type": "number",
-                    "format": "float64"
-                }
-            }
-        },
-        "github_com_99minutos_shipping-system_internal_core_ports.SenderInput": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem": {
-            "type": "object",
-            "properties": {
-                "notes": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_api_handler.addressRequest": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "coordinates": {
-                    "$ref": "#/definitions/internal_api_handler.coordinatesRequest"
+                    "$ref": "#/definitions/handler.coordinatesRequest"
                 },
                 "zip_code": {
                     "type": "string"
                 }
             }
         },
-        "internal_api_handler.authResponse": {
+        "handler.addressResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "coordinates": {
+                    "$ref": "#/definitions/handler.coordinatesResponse"
+                },
+                "zip_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.authResponse": {
             "type": "object",
             "properties": {
                 "expires_in": {
-                    "description": "seconds",
                     "type": "integer"
                 },
                 "token": {
@@ -448,10 +445,28 @@ const docTemplate = `{
                 },
                 "token_type": {
                     "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/handler.userPayload"
                 }
             }
         },
-        "internal_api_handler.coordinatesRequest": {
+        "handler.coordinatesRequest": {
+            "type": "object",
+            "required": [
+                "lat",
+                "lng"
+            ],
+            "properties": {
+                "lat": {
+                    "type": "number"
+                },
+                "lng": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.coordinatesResponse": {
             "type": "object",
             "properties": {
                 "lat": {
@@ -462,31 +477,43 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.createShipmentRequest": {
+        "handler.createShipmentRequest": {
             "type": "object",
+            "required": [
+                "destination",
+                "origin",
+                "package",
+                "sender",
+                "service_type"
+            ],
             "properties": {
                 "destination": {
-                    "$ref": "#/definitions/internal_api_handler.addressRequest"
+                    "$ref": "#/definitions/handler.addressRequest"
                 },
                 "origin": {
-                    "$ref": "#/definitions/internal_api_handler.addressRequest"
+                    "$ref": "#/definitions/handler.addressRequest"
                 },
                 "package": {
-                    "$ref": "#/definitions/internal_api_handler.packageRequest"
+                    "$ref": "#/definitions/handler.packageRequest"
                 },
                 "sender": {
-                    "$ref": "#/definitions/internal_api_handler.senderRequest"
+                    "$ref": "#/definitions/handler.senderRequest"
                 },
                 "service_type": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "same_day",
+                        "next_day",
+                        "standard"
+                    ]
                 }
             }
         },
-        "internal_api_handler.createShipmentResponse": {
+        "handler.createShipmentResponse": {
             "type": "object",
             "properties": {
                 "_links": {
-                    "$ref": "#/definitions/internal_api_handler.shipmentLinks"
+                    "$ref": "#/definitions/handler.shipmentLinks"
                 },
                 "created_at": {
                     "type": "string"
@@ -502,7 +529,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.dependencyStatus": {
+        "handler.dependencyStatus": {
             "type": "object",
             "properties": {
                 "error": {
@@ -513,7 +540,26 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.dimensionsRequest": {
+        "handler.dimensionsRequest": {
+            "type": "object",
+            "required": [
+                "height_cm",
+                "length_cm",
+                "width_cm"
+            ],
+            "properties": {
+                "height_cm": {
+                    "type": "number"
+                },
+                "length_cm": {
+                    "type": "number"
+                },
+                "width_cm": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.dimensionsResponse": {
             "type": "object",
             "properties": {
                 "height_cm": {
@@ -527,29 +573,37 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.getShipmentResponse": {
+        "handler.errorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.getShipmentResponse": {
             "type": "object",
             "properties": {
                 "_links": {
-                    "$ref": "#/definitions/internal_api_handler.shipmentLinks"
+                    "$ref": "#/definitions/handler.shipmentLinks"
                 },
                 "created_at": {
                     "type": "string"
                 },
                 "destination": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput"
+                    "$ref": "#/definitions/handler.addressResponse"
                 },
                 "estimated_delivery": {
                     "type": "string"
                 },
                 "origin": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.AddressInput"
+                    "$ref": "#/definitions/handler.addressResponse"
                 },
                 "package": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.PackageInput"
+                    "$ref": "#/definitions/handler.packageResponse"
                 },
                 "sender": {
-                    "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.SenderInput"
+                    "$ref": "#/definitions/handler.senderResponse"
                 },
                 "service_type": {
                     "type": "string"
@@ -560,7 +614,7 @@ const docTemplate = `{
                 "status_history": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_99minutos_shipping-system_internal_core_ports.StatusHistoryItem"
+                        "$ref": "#/definitions/handler.statusHistoryItemResponse"
                     }
                 },
                 "tracking_number": {
@@ -568,7 +622,21 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.loginRequest": {
+        "handler.listShipmentsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.shipmentSummaryResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/handler.paginationResponse"
+                }
+            }
+        },
+        "handler.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -579,7 +647,34 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.packageRequest": {
+        "handler.packageRequest": {
+            "type": "object",
+            "required": [
+                "currency",
+                "declared_value",
+                "description",
+                "dimensions",
+                "weight_kg"
+            ],
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "declared_value": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "$ref": "#/definitions/handler.dimensionsRequest"
+                },
+                "weight_kg": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.packageResponse": {
             "type": "object",
             "properties": {
                 "currency": {
@@ -592,20 +687,37 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "dimensions": {
-                    "$ref": "#/definitions/internal_api_handler.dimensionsRequest"
+                    "$ref": "#/definitions/handler.dimensionsResponse"
                 },
                 "weight_kg": {
                     "type": "number"
                 }
             }
         },
-        "internal_api_handler.readinessResponse": {
+        "handler.paginationResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.readinessResponse": {
             "type": "object",
             "properties": {
                 "dependencies": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/internal_api_handler.dependencyStatus"
+                        "$ref": "#/definitions/handler.dependencyStatus"
                     }
                 },
                 "status": {
@@ -613,7 +725,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.registerRequest": {
+        "handler.registerRequest": {
             "type": "object",
             "properties": {
                 "client_id": {
@@ -633,7 +745,26 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.senderRequest": {
+        "handler.senderRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "phone"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.senderResponse": {
             "type": "object",
             "properties": {
                 "email": {
@@ -647,13 +778,73 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_api_handler.shipmentLinks": {
+        "handler.shipmentLinks": {
             "type": "object",
             "properties": {
                 "events": {
                     "type": "string"
                 },
                 "self": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.shipmentSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "_links": {
+                    "$ref": "#/definitions/handler.shipmentLinks"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "destination": {
+                    "$ref": "#/definitions/handler.addressResponse"
+                },
+                "estimated_delivery": {
+                    "type": "string"
+                },
+                "origin": {
+                    "$ref": "#/definitions/handler.addressResponse"
+                },
+                "sender": {
+                    "$ref": "#/definitions/handler.senderResponse"
+                },
+                "service_type": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tracking_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.statusHistoryItemResponse": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.userPayload": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
