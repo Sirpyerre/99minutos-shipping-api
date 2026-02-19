@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	apimetrics "github.com/99minutos/shipping-system/internal/api/metrics"
 	"github.com/99minutos/shipping-system/internal/core/domain"
 	"github.com/99minutos/shipping-system/internal/core/ports"
 )
@@ -92,6 +93,7 @@ func (s *ShipmentService) CreateShipment(ctx context.Context, input ports.Create
 	}
 
 	s.logger.Info().Str("tracking_number", shipment.TrackingNumber).Str("client_id", input.ClientID).Msg("shipment created")
+	apimetrics.ShipmentsCreatedTotal.WithLabelValues(input.ServiceType).Inc()
 
 	return &ports.ShipmentResult{
 		TrackingNumber:    shipment.TrackingNumber,

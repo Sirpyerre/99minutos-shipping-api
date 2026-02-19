@@ -2,10 +2,13 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
+	"time"
 
 	"github.com/rs/zerolog"
 
+	apimetrics "github.com/99minutos/shipping-system/internal/api/metrics"
 	"github.com/99minutos/shipping-system/internal/core/ports"
 )
 
@@ -49,7 +52,9 @@ func (d *Dispatcher) Start(ctx context.Context) {
 // Enqueue sends an event to the worker responsible for its tracking number.
 // The call is non-blocking up to channelBuffer capacity.
 func (d *Dispatcher) Enqueue(event ports.TrackingEventInput) {
-	d.workers[d.shardIndex(event.TrackingNumber)] <- event
+	idx := d.shardIndex(event.TrackingNumber)
+	d.workers[idx] <- event
+	apimetrics.EventsQueueDepth.WithLabelValues(fmt.Sprintf("%d", idx)).Set(float64(len(d.workers[idx])))
 }
 
 // EnqueueBatch enqueues multiple events preserving per-shipment ordering.
@@ -67,6 +72,7 @@ func (d *Dispatcher) shardIndex(trackingNumber string) int {
 }
 
 func (d *Dispatcher) runWorker(ctx context.Context, id int, ch <-chan ports.TrackingEventInput) {
+	workerLabel := fmt.Sprintf("%d", id)
 	for {
 		select {
 		case <-ctx.Done():
@@ -75,12 +81,22 @@ func (d *Dispatcher) runWorker(ctx context.Context, id int, ch <-chan ports.Trac
 			if !ok {
 				return
 			}
-			if err := d.service.Process(ctx, event); err != nil {
+			// Update queue depth after dequeue
+			apimetrics.EventsQueueDepth.WithLabelValues(workerLabel).Set(float64(len(ch)))
+
+			start := time.Now()
+			err := d.service.Process(ctx, event)
+			elapsed := time.Since(start).Seconds()
+
+			statusLabel := event.Status
+			if err != nil {
+				statusLabel = "error"
 				d.log.Error().Err(err).
 					Str("tracking_number", event.TrackingNumber).
 					Int("worker_id", id).
 					Msg("event processing failed")
 			}
+			apimetrics.EventProcessingDuration.WithLabelValues(statusLabel).Observe(elapsed)
 		}
 	}
 }

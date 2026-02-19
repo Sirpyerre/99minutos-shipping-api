@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/redis/go-redis/v9"
@@ -11,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/99minutos/shipping-system/internal/api/handler"
+	_ "github.com/99minutos/shipping-system/internal/api/metrics" // register custom metrics with Prometheus
 	"github.com/99minutos/shipping-system/internal/api/middleware"
 	"github.com/99minutos/shipping-system/internal/core/service"
 	mongoinfra "github.com/99minutos/shipping-system/internal/infrastructure/db/mongo"
@@ -30,6 +32,7 @@ func NewRouter(ctx context.Context, db *mongo.Database, rdb *redis.Client, jwtSe
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.RequestID())
 	e.Use(echomiddleware.Logger())
+	e.Use(echoprometheus.NewMiddleware("shipping_http")) // HTTP metrics: duration, requests, size
 
 	// --- Dependencies ---
 	log := logger.Init(logger.Options{Pretty: true})
@@ -63,6 +66,9 @@ func NewRouter(ctx context.Context, db *mongo.Database, rdb *redis.Client, jwtSe
 
 	e.GET("/health", healthHandler.Liveness)
 	e.GET("/health/ready", healthDepsHandler.Readiness)
+
+	// --- Metrics scraping endpoint (public — protected at network level in prod) ---
+	e.GET("/metrics", echoprometheus.NewHandler())
 
 	// --- Swagger UI ---
 	e.GET("/swagger/*", echoswagger.WrapHandler)
