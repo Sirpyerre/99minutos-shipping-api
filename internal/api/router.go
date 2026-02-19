@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -13,11 +14,14 @@ import (
 	"github.com/99minutos/shipping-system/internal/api/middleware"
 	"github.com/99minutos/shipping-system/internal/core/service"
 	mongoinfra "github.com/99minutos/shipping-system/internal/infrastructure/db/mongo"
+	redisinfra "github.com/99minutos/shipping-system/internal/infrastructure/db/redis"
+	"github.com/99minutos/shipping-system/internal/infrastructure/queue"
 	"github.com/99minutos/shipping-system/internal/pkg/logger"
 )
 
 // NewRouter builds and returns the Echo instance with all routes registered.
-func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Echo {
+// ctx is used to control the lifecycle of background event workers.
+func NewRouter(ctx context.Context, db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.Validator = handler.NewValidator()
@@ -40,6 +44,13 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 	shipmentService := service.NewShipmentService(shipmentRepo, log)
 	shipmentHandler := handler.NewShipmentHandler(shipmentService)
 
+	eventRepo := mongoinfra.NewEventRepository(db)
+	dedup := redisinfra.NewDedupChecker(rdb)
+	eventService := service.NewEventService(shipmentRepo, eventRepo, dedup, log)
+	dispatcher := queue.NewDispatcher(0, eventService, log)
+	dispatcher.Start(ctx)
+	eventHandler := handler.NewEventHandler(dispatcher)
+
 	authMiddleware := middleware.Auth(jwtSecret)
 
 	// --- Auth routes (public) ---
@@ -61,6 +72,8 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 	v1.GET("/shipments", shipmentHandler.List)
 	v1.POST("/shipments", shipmentHandler.Create)
 	v1.GET("/shipments/:tracking_number", shipmentHandler.Get)
+	v1.POST("/events", eventHandler.Receive)
+	v1.POST("/events/batch", eventHandler.ReceiveBatch)
 
 	return e
 }
