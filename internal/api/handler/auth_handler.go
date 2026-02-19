@@ -26,7 +26,7 @@ type registerRequest struct {
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -86,7 +86,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
 	}
 
-	token, user, err := h.authService.Login(c.Request().Context(), req.Username, req.Password)
+	token, user, err := h.authService.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
 		status := http.StatusUnauthorized
 		switch err {

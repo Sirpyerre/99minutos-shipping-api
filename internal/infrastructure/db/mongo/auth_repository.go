@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/99minutos/shipping-system/internal/core/domain"
@@ -24,6 +25,7 @@ func NewAuthRepository(db *mongo.Database) *MongoAuthRepository {
 type mongoUser struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty"`
 	Username     string             `bson:"username"`
+	Email        string             `bson:"email"`
 	PasswordHash string             `bson:"password_hash"`
 	Role         string             `bson:"role"`
 	ClientID     string             `bson:"client_id,omitempty"`
@@ -34,6 +36,7 @@ type mongoUser struct {
 func (r *MongoAuthRepository) Create(ctx context.Context, user *domain.User) (*domain.User, error) {
 	doc := mongoUser{
 		Username:     user.Username,
+		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		Role:         user.Role,
 		ClientID:     user.ClientID,
@@ -50,16 +53,17 @@ func (r *MongoAuthRepository) Create(ctx context.Context, user *domain.User) (*d
 	}
 
 	// fetch back to get ID
-	created, err := r.FindByUsername(ctx, user.Username)
+	created, err := r.FindByEmail(ctx, user.Email)
 	if err != nil {
 		return nil, err
 	}
 	return created, nil
 }
 
-func (r *MongoAuthRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
+func (r *MongoAuthRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+	log.Printf("Finding user by email: %s", email)
 	var mu mongoUser
-	if err := r.coll.FindOne(ctx, bson.M{"username": username}).Decode(&mu); err != nil {
+	if err := r.coll.FindOne(ctx, bson.M{"email": email}).Decode(&mu); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, domain.ErrUserNotFound
 		}
@@ -69,6 +73,7 @@ func (r *MongoAuthRepository) FindByUsername(ctx context.Context, username strin
 	return &domain.User{
 		ID:           mu.ID.Hex(),
 		Username:     mu.Username,
+		Email:        mu.Email,
 		PasswordHash: mu.PasswordHash,
 		Role:         mu.Role,
 		ClientID:     mu.ClientID,

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -26,7 +27,7 @@ func NewAuthService(repo ports.AuthRepository, jwtSecret string, tokenTTL time.D
 }
 
 func (s *AuthService) Register(ctx context.Context, username, password, email, role, clientID string) (*domain.User, error) {
-	if username == "" || password == "" || role == "" {
+	if username == "" || password == "" || role == "" || email == "" {
 		return nil, domain.ErrInvalidCredentials
 	}
 	if role != domain.RoleAdmin && role != domain.RoleClient {
@@ -41,6 +42,7 @@ func (s *AuthService) Register(ctx context.Context, username, password, email, r
 	now := time.Now().UTC()
 	user := &domain.User{
 		Username:     username,
+		Email:        email,
 		PasswordHash: string(hash),
 		Role:         role,
 		ClientID:     clientID,
@@ -55,17 +57,21 @@ func (s *AuthService) Register(ctx context.Context, username, password, email, r
 	return created, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, username, password string) (string, *domain.User, error) {
-	if username == "" || password == "" {
+func (s *AuthService) Login(ctx context.Context, email, password string) (string, *domain.User, error) {
+	if email == "" || password == "" {
 		return "", nil, domain.ErrInvalidCredentials
 	}
 
-	user, err := s.repo.FindByUsername(ctx, username)
+	log.Printf("pass %s", password)
+	user, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
+		log.Printf("Login failed for email %s: %v", email, err)
 		return "", nil, err
 	}
 
+	log.Printf("User found for email %s:, password_hash=%s", email, user.PasswordHash)
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+		log.Printf("Invalid password for email %s", email)
 		return "", nil, domain.ErrInvalidCredentials
 	}
 

@@ -11,6 +11,7 @@ const (
 type User struct {
 	ID           string    `json:"id"`
 	Username     string    `json:"username"`
+	Email        string    `json:"email,omitempty"`
 	PasswordHash string    `json:"-"`
 	Role         string    `json:"role"`
 	ClientID     string    `json:"client_id,omitempty"`
