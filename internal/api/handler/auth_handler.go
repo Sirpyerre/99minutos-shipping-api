@@ -31,8 +31,9 @@ type loginRequest struct {
 }
 
 type authResponse struct {
-	Token string       `json:"token,omitempty"`
-	User  *domain.User `json:"user,omitempty"`
+	Token     string `json:"token"`
+	TokenType string `json:"token_type"`
+	ExpiresIn int    `json:"expires_in"` // seconds
 }
 
 // Register creates a new user account.
@@ -65,7 +66,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(status, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusCreated, authResponse{User: user})
+	_ = user
+	return c.JSON(http.StatusCreated, map[string]string{"message": "user created"})
 }
 
 // Login authenticates a user and returns a JWT token.
@@ -86,7 +88,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
 	}
 
-	token, user, err := h.authService.Login(c.Request().Context(), req.Email, req.Password)
+	token, _, err := h.authService.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
 		status := http.StatusUnauthorized
 		switch err {
@@ -98,5 +100,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(status, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, authResponse{Token: token, User: user})
+	return c.JSON(http.StatusOK, authResponse{
+		Token:     token,
+		TokenType: "Bearer",
+		ExpiresIn: 86400, // 24 h, matches service default TTL
+	})
 }

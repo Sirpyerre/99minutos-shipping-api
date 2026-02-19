@@ -16,7 +16,7 @@ db.auth_users.createIndex({ email: 1 }, { unique: true });
 
 // ── Seed users ────────────────────────────────────────────────────────────────
 // bcrypt hash of "password123" (cost 12)
-const PASSWORD_HASH = "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6hsxq/LbMi";
+const PASSWORD_HASH = "$2a$12$bBXOztiJVYqEE7E6Dm/ag.pE607fDxB9QOR9WWHo1WeV8ihtedG2y";
 
 const NOW = Math.floor(new Date().getTime() / 1000);
 
