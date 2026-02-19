@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  handler.acceptedResponse:
+    properties:
+      count:
+        type: integer
+      message:
+        type: string
+    type: object
   handler.addressRequest:
     properties:
       address:
@@ -161,6 +168,16 @@ definitions:
       pagination:
         $ref: '#/definitions/handler.paginationResponse'
     type: object
+  handler.locationRequest:
+    properties:
+      lat:
+        type: number
+      lng:
+        type: number
+    required:
+    - lat
+    - lng
+    type: object
   handler.loginRequest:
     properties:
       email:
@@ -292,6 +309,30 @@ definitions:
       timestamp:
         type: string
     type: object
+  handler.trackingEventRequest:
+    properties:
+      location:
+        $ref: '#/definitions/handler.locationRequest'
+      source:
+        type: string
+      status:
+        enum:
+        - picked_up
+        - in_warehouse
+        - in_transit
+        - delivered
+        - cancelled
+        type: string
+      timestamp:
+        type: string
+      tracking_number:
+        type: string
+    required:
+    - source
+    - status
+    - timestamp
+    - tracking_number
+    type: object
   handler.userPayload:
     properties:
       client_id:
@@ -422,6 +463,78 @@ paths:
       summary: Readiness probe
       tags:
       - health
+  /v1/events:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tracking event
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.trackingEventRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handler.acceptedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Ingest a single tracking event
+      tags:
+      - events
+  /v1/events/batch:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Array of tracking events
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/handler.trackingEventRequest'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handler.acceptedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Ingest a batch of tracking events
+      tags:
+      - events
   /v1/shipments:
     get:
       parameters:

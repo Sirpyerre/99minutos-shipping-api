@@ -25,6 +25,15 @@ test: ## Run all tests
 test-race: ## Run tests with race detector (required before commit)
 	go test -race ./...
 
+test-k6: ## Run K6 integration tests (requires k6 CLI and a running API at BASE_URL)
+	k6 run test/k6/auth.test.js
+	k6 run test/k6/shipments.test.js
+	k6 run test/k6/events.test.js
+	k6 run test/k6/e2e.test.js
+
+test-k6-e2e: ## Run only the end-to-end K6 scenario
+	k6 run test/k6/e2e.test.js
+
 test-coverage: ## Generate HTML coverage report
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
