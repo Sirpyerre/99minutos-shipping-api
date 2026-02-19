@@ -1,9 +1,9 @@
 BINARY     = bin/server
 MODULE     = github.com/99minutos/shipping-system
 BUILD_FLAGS = -ldflags="-s -w"
-DOCKER_COMPOSE = docker compose -f deployments/docker-compose.yaml
+DOCKER_COMPOSE = docker compose
 
-.PHONY: help build run test test-race test-coverage lint fmt deps clean \
+.PHONY: help build swagger run test test-race test-coverage lint fmt deps clean \
         docker-up docker-down docker-logs docker-build
 
 help: ## Show available commands
@@ -12,6 +12,9 @@ help: ## Show available commands
 
 build: ## Build binary → ./bin/server
 	go build $(BUILD_FLAGS) -o $(BINARY) ./cmd/server
+
+swagger: ## Generate Swagger docs (requires swag CLI: go install github.com/swaggo/swag/cmd/swag@latest)
+	swag init -g cmd/server/main.go -o docs --parseDependency
 
 run: ## Run locally (requires MongoDB + Redis)
 	go run ./cmd/server

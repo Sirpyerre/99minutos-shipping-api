@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/redis/go-redis/v9"
+	echoswagger "github.com/swaggo/echo-swagger"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/99minutos/shipping-system/internal/api/handler"
@@ -41,6 +42,9 @@ func NewRouter(db *mongo.Database, rdb *redis.Client, jwtSecret string) *echo.Ec
 
 	e.GET("/health", healthHandler.Liveness)            // liveness  – is the process alive?
 	e.GET("/health/ready", healthDepsHandler.Readiness) // readiness – are dependencies up?
+
+	// --- Swagger UI ---
+	e.GET("/swagger/*", echoswagger.WrapHandler)
 
 	return e
 }

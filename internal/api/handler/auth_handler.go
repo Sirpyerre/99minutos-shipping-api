@@ -35,7 +35,18 @@ type authResponse struct {
 	User  *domain.User `json:"user,omitempty"`
 }
 
-// Register creates a user and returns the created user (no token issued here).
+// Register creates a new user account.
+//
+// @Summary      Register a new user
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      registerRequest  true  "User registration details"
+// @Success      201   {object}  authResponse
+// @Failure      400   {object}  map[string]string
+// @Failure      409   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /auth/register [post]
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req registerRequest
 	if err := c.Bind(&req); err != nil {
@@ -57,7 +68,18 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	return c.JSON(http.StatusCreated, authResponse{User: user})
 }
 
-// Login authenticates a user and returns a JWT plus user info.
+// Login authenticates a user and returns a JWT token.
+//
+// @Summary      Login
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      loginRequest  true  "Login credentials"
+// @Success      200   {object}  authResponse
+// @Failure      400   {object}  map[string]string
+// @Failure      401   {object}  map[string]string
+// @Failure      404   {object}  map[string]string
+// @Router       /auth/login [post]
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req loginRequest
 	if err := c.Bind(&req); err != nil {

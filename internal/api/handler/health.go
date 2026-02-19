@@ -19,6 +19,13 @@ func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 
+// Liveness returns 200 if the process is alive.
+//
+// @Summary      Liveness probe
+// @Tags         health
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Router       /health [get]
 func (h *HealthHandler) Liveness(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status": "ok",
@@ -49,6 +56,14 @@ type readinessResponse struct {
 	Dependencies map[string]dependencyStatus `json:"dependencies"`
 }
 
+// Readiness checks MongoDB and Redis connectivity.
+//
+// @Summary      Readiness probe
+// @Tags         health
+// @Produce      json
+// @Success      200  {object}  readinessResponse
+// @Failure      503  {object}  readinessResponse
+// @Router       /health/ready [get]
 func (h *HealthDependenciesHandler) Readiness(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 3*time.Second)
 	defer cancel()
