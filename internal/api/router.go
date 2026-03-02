@@ -31,7 +31,12 @@ func NewRouter(ctx context.Context, db *mongo.Database, rdb *redis.Client, jwtSe
 	// --- Global middleware ---
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.RequestID())
-	e.Use(echomiddleware.Logger())
+	e.Use(echomiddleware.LoggerWithConfig(echomiddleware.LoggerConfig{
+		Skipper: func(c echo.Context) bool {
+			path := c.Request().URL.Path
+			return path == "/metrics" || path == "/health" || path == "/health/ready"
+		},
+	}))
 	e.Use(echoprometheus.NewMiddleware("shipping_http")) // HTTP metrics: duration, requests, size
 
 	// --- Dependencies ---
