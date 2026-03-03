@@ -1,5 +1,6 @@
 # Binary / build output
 bin/
+
 server
 
 # Go toolchain

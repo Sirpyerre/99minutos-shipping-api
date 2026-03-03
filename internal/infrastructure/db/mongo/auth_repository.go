@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/99minutos/shipping-system/internal/core/domain"
@@ -61,7 +60,6 @@ func (r *MongoAuthRepository) Create(ctx context.Context, user *domain.User) (*d
 }
 
 func (r *MongoAuthRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	log.Printf("Finding user by email: %s", email)
 	var mu mongoUser
 	if err := r.coll.FindOne(ctx, bson.M{"email": email}).Decode(&mu); err != nil {
 		if err == mongo.ErrNoDocuments {

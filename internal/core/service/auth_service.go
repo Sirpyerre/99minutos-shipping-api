@@ -62,14 +62,12 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", nil, domain.ErrInvalidCredentials
 	}
 
-	log.Printf("pass %s", password)
 	user, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
 		log.Printf("Login failed for email %s: %v", email, err)
 		return "", nil, err
 	}
 
-	log.Printf("User found for email %s:, password_hash=%s", email, user.PasswordHash)
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		log.Printf("Invalid password for email %s", email)
 		return "", nil, domain.ErrInvalidCredentials
